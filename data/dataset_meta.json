@@ -1,0 +1,16 @@
+{
+  "target_asin": "B002QZ1RS6",
+  "product_title": "Beachbody INSANITY 60-Day Total-Body Workout Program",
+  "total_reviews": 957,
+  "sample_size": 500,
+  "score_distribution": {
+    "1.0": 82,
+    "2.0": 34,
+    "3.0": 58,
+    "4.0": 139,
+    "5.0": 644
+  },
+  "start_date": "2009-09-30 00:00:00",
+  "end_date": "2012-10-24 00:00:00",
+  "source": "Stanford SNAP Amazon Movie Reviews"
+}

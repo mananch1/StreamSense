@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StreamSense — Dynamic Semantic Data Drift Control System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="dark-theme">
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="pulse-indicator" id="statusPulse"></div>
+      <div class="brand-text">
+        <h1 class="brand-title">StreamSense <span class="badge-tag">AML Lab</span></h1>
+        <p class="brand-sub">Real-Time Social Feed Summarization & Sentiment under Synthetic Semantic Drift</p>
+      </div>
+    </div>
+
+    <div class="header-kpis">
+      <div class="kpi-pill">
+        <span class="kpi-label">Movie ASIN</span>
+        <span class="kpi-val cyan" id="activeAsin">B002QZ1RS6</span>
+      </div>
+      <div class="kpi-pill">
+        <span class="kpi-label">Streamed Msgs</span>
+        <span class="kpi-val" id="statStreamedCount">0</span>
+      </div>
+      <div class="kpi-pill">
+        <span class="kpi-label">Windows (N/T)</span>
+        <span class="kpi-val" id="statWindowsCount">0</span>
+      </div>
+      <div class="kpi-pill kpi-drift">
+        <span class="kpi-label">Drift Magnitude</span>
+        <span class="kpi-val amber" id="statDriftScore">0.0%</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 3-Column Main Workspace -->
+  <div class="app-workspace">
+    
+    <!-- Column 1: Control Panel -->
+    <aside class="workspace-col col-controls">
+      <div class="col-head">
+        <div class="col-head-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <h3>Drift Controls</h3>
+        </div>
+        <span class="source-tag">arXiv:2403.12328</span>
+      </div>
+
+      <div class="col-body scrollable-body">
+        
+        <!-- Stream Action Buttons (Sticky/Top) -->
+        <div class="control-actions">
+          <button id="btnStartFeed" class="btn btn-start">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            Start Stream
+          </button>
+          <button id="btnPauseFeed" class="btn btn-pause" disabled>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+            Pause
+          </button>
+          <button id="btnResetFeed" class="btn btn-reset">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6M21.5 22v-6h-6"></path><path d="M22 11.5A10 10 0 0 0 3.2 7.2L2.5 8M2 12.5a10 10 0 0 0 18.8 4.3l.7-.8"></path></svg>
+            Reset
+          </button>
+        </div>
+
+        <!-- Section 1: Stream Parameters -->
+        <div class="cfg-section">
+          <div class="cfg-section-title">Stream & Windowing Buffer</div>
+          
+          <div class="cfg-row">
+            <div class="cfg-label-val">
+              <label for="speedSlider">Stream Velocity</label>
+              <span id="speedVal" class="mono-badge">2.0 msgs/s</span>
+            </div>
+            <input type="range" id="speedSlider" min="0.5" max="12.0" step="0.5" value="2.0" />
+          </div>
+
+          <div class="cfg-grid-2">
+            <div class="cfg-input-item">
+              <label for="windowCountInput">Limit (N msgs)</label>
+              <input type="number" id="windowCountInput" class="compact-input" min="5" max="200" value="25" />
+            </div>
+            <div class="cfg-input-item">
+              <label for="windowTimeInput">Timeout (T sec)</label>
+              <input type="number" id="windowTimeInput" class="compact-input" min="2" max="120" value="15" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Drift Dynamics Trajectory -->
+        <div class="cfg-section">
+          <div class="cfg-section-title">Drift Dynamic Trajectory</div>
+          
+          <div class="cfg-row">
+            <label for="driftCurveSelect" class="sub-label">Temporal Curve</label>
+            <select id="driftCurveSelect" class="compact-select">
+              <option value="constant">Constant Intensity</option>
+              <option value="gradual">Gradual Ramp (Linear Slope)</option>
+              <option value="sudden">Sudden Step Jump (Delta=1)</option>
+              <option value="sinusoidal">Sinusoidal Wave (Periodic)</option>
+              <option value="step">Step Ladder (Discrete)</option>
+            </select>
+          </div>
+
+          <div class="cfg-row">
+            <div class="cfg-label-val">
+              <label for="cycleLengthSlider">Cycle Wavelength</label>
+              <span id="cycleLengthVal" class="mono-badge">100 msgs</span>
+            </div>
+            <input type="range" id="cycleLengthSlider" min="20" max="300" step="10" value="100" />
+          </div>
+        </div>
+
+        <!-- Section 3: Drift Methods -->
+        <div class="cfg-section">
+          <div class="cfg-section-title">Drift Injection Methods</div>
+
+          <!-- Method 1: Adjective Swap -->
+          <div class="method-box" id="cardAdjSwap">
+            <div class="method-box-header">
+              <div class="method-info">
+                <span class="m-badge paper">Paper</span>
+                <strong>Adjective Swap (WordNet)</strong>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleAdjSwap" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="method-desc">Replaces sentiment adjectives with antonyms via POS tagging</div>
+            <div class="method-slider-row">
+              <span>Perturbation Intensity</span>
+              <span id="valAdjSwap" class="mono-badge">50%</span>
+            </div>
+            <input type="range" id="sliderAdjSwap" min="0.05" max="1.0" step="0.05" value="0.5" />
+          </div>
+
+          <!-- Method 2: Formality & Slang Shift -->
+          <div class="method-box" id="cardFormality">
+            <div class="method-box-header">
+              <div class="method-info">
+                <span class="m-badge custom">Custom</span>
+                <strong>Formality & Slang Shift</strong>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleFormality" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="method-desc">Converts review phrasing into modern internet/social slang</div>
+            <div class="method-slider-row">
+              <span>Slang Density</span>
+              <span id="valFormality" class="mono-badge">50%</span>
+            </div>
+            <input type="range" id="sliderFormality" min="0.1" max="1.0" step="0.05" value="0.5" />
+          </div>
+
+          <!-- Method 3: Noise Injection -->
+          <div class="method-box" id="cardNoise">
+            <div class="method-box-header">
+              <div class="method-info">
+                <span class="m-badge custom">Custom</span>
+                <strong>Noise & Typo Injection</strong>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleNoise" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="method-desc">Keyboard proximity typos, vowel omissions & character swaps</div>
+            <div class="method-slider-row">
+              <span>Corruption Level</span>
+              <span id="valNoise" class="mono-badge">30%</span>
+            </div>
+            <input type="range" id="sliderNoise" min="0.05" max="1.0" step="0.05" value="0.3" />
+          </div>
+
+          <!-- Method 4: Class Swap -->
+          <div class="method-box" id="cardClassSwap">
+            <div class="method-box-header">
+              <div class="method-info">
+                <span class="m-badge paper">Paper</span>
+                <strong>Class Swap (Abrupt Inversion)</strong>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleClassSwap" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="method-desc">Inverts ratings: 1★ ↔ 5★, 2★ ↔ 4★ (Simulates ground truth label drift)</div>
+          </div>
+
+          <!-- Method 5: Class Shift -->
+          <div class="method-box" id="cardClassShift">
+            <div class="method-box-header">
+              <div class="method-info">
+                <span class="m-badge paper">Paper</span>
+                <strong>Class Shift (Cyclic Recalibration)</strong>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleClassShift" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="method-desc">Cyclically shifts rating standards (+1 star)</div>
+          </div>
+
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- Column 2: Live Feed Stream Comparison -->
+    <main class="workspace-col col-feed">
+      <div class="col-head">
+        <div class="col-head-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          <h3>Live Stream Comparison</h3>
+        </div>
+        <div class="feed-badge-status" id="feedLiveStatus">STREAM IDLE</div>
+      </div>
+
+      <div class="feed-column-bar">
+        <div class="feed-bar-left">Original Input (Amazon Review)</div>
+        <div class="feed-bar-right">Drifted Stream (Fed into Social App)</div>
+      </div>
+
+      <div class="feed-scroll-area" id="feedCardsContainer">
+        <div class="empty-feed-placeholder" id="feedEmptyState">
+          <div class="empty-icon">📡</div>
+          <h4>Stream Simulator is Idle</h4>
+          <p>Click <strong>Start Stream</strong> in the control panel to begin streaming Amazon movie reviews through the drift engine.</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Column 3: Real-Time Drift Analytics & Metrics -->
+    <aside class="workspace-col col-metrics">
+      <div class="col-head">
+        <div class="col-head-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"></path></svg>
+          <h3>Drift Analytics</h3>
+        </div>
+        <span class="live-pill">LIVE METRICS</span>
+      </div>
+
+      <div class="col-body scrollable-body">
+        
+        <!-- Chart 1: Net Drift Magnitude -->
+        <div class="metric-card">
+          <div class="metric-card-head">
+            <strong>Composite Drift Magnitude (%)</strong>
+            <span class="m-sub">Weighted distance</span>
+          </div>
+          <div class="chart-canvas-box">
+            <canvas id="chartMagnitude"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 2: TF-IDF Cosine Sim & Vocab Overlap -->
+        <div class="metric-card">
+          <div class="metric-card-head">
+            <strong>Cosine Similarity & Vocab Overlap</strong>
+            <span class="m-sub">Semantic divergence</span>
+          </div>
+          <div class="chart-canvas-box">
+            <canvas id="chartSimilarity"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 3: Sentiment & KL-Divergence -->
+        <div class="metric-card">
+          <div class="metric-card-head">
+            <strong>Sentiment Polarity & KL Divergence</strong>
+            <span class="m-sub">Distribution shift</span>
+          </div>
+          <div class="chart-canvas-box">
+            <canvas id="chartSentiment"></canvas>
+          </div>
+        </div>
+
+        <!-- Latest Window Summary Box -->
+        <div class="window-summary-box">
+          <div class="summary-box-title">Latest Window Flush (Tumbling Window)</div>
+          <div class="summary-grid">
+            <div class="s-item">
+              <span class="s-label">Trigger Reason:</span>
+              <span class="s-val" id="lblTriggerReason">Waiting for window...</span>
+            </div>
+            <div class="s-item">
+              <span class="s-label">TF-IDF Cosine Sim:</span>
+              <span class="s-val cyan" id="lblCosineSim">1.000</span>
+            </div>
+            <div class="s-item">
+              <span class="s-label">Vocabulary Overlap:</span>
+              <span class="s-val purple" id="lblVocabOverlap">100.0%</span>
+            </div>
+            <div class="s-item">
+              <span class="s-label">Sentiment KL-Div:</span>
+              <span class="s-val emerald" id="lblKLDiv">0.000</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
