@@ -20,12 +20,21 @@ from src.config import DriftConfig
 
 # Ensure necessary NLTK models are downloaded
 def ensure_nltk_corpora():
-    packages = ["wordnet", "omw-1.4", "averaged_perceptron_tagger_eng", "punkt_tab", "punkt"]
-    for pkg in packages:
+    packages = {
+        "corpora/wordnet": "wordnet",
+        "corpora/omw-1.4": "omw-1.4",
+        "taggers/averaged_perceptron_tagger_eng": "averaged_perceptron_tagger_eng",
+        "tokenizers/punkt_tab": "punkt_tab",
+        "tokenizers/punkt": "punkt"
+    }
+    for resource, pkg in packages.items():
         try:
-            nltk.download(pkg, quiet=True)
-        except Exception:
-            pass
+            nltk.data.find(resource)
+        except LookupError:
+            try:
+                nltk.download(pkg, quiet=True)
+            except Exception:
+                pass
 
 ensure_nltk_corpora()
 
@@ -241,20 +250,32 @@ class DriftEngine:
     def apply_noise_injection(self, text: str, intensity: float) -> Tuple[str, List[Dict[str, str]]]:
         """
         Custom Practical Extension:
-        Introduces typos, omitted vowels, character transpositions, or truncation.
+        Introduces keyboard typos, omitted vowels, character transpositions, or duplicate characters.
+        Records corrupted words for visual typo highlighting.
         """
         if intensity <= 0.01 or not text:
             return text, []
 
-        chars = list(text)
-        modifications = []
-        n_mutations = max(1, int(len(chars) * 0.08 * intensity))
+        words_matches = list(re.finditer(r'\b[A-Za-z0-9\'-]+\b', text))
+        if not words_matches:
+            return text, []
 
-        for _ in range(n_mutations):
-            if not chars:
-                break
-            idx = random.randint(0, len(chars) - 1)
-            char = chars[idx]
+        modifications = []
+        n_mutations = max(1, int(len(words_matches) * 0.12 * intensity))
+        chosen_indices = sorted(random.sample(range(len(words_matches)), min(n_mutations, len(words_matches))), reverse=True)
+
+        modified_text = text
+        for idx in chosen_indices:
+            match = words_matches[idx]
+            orig_word = match.group(0)
+
+            # Skip single-letter words to avoid polluting common pronouns/articles
+            if len(orig_word) <= 1:
+                continue
+
+            chars = list(orig_word)
+            char_idx = random.randint(0, len(chars) - 1)
+            char = chars[char_idx]
             char_lower = char.lower()
 
             mutation_type = random.choice(["typo", "drop", "swap", "duplicate"])
@@ -263,25 +284,37 @@ class DriftEngine:
                 replacement = random.choice(KEYBOARD_ADJACENCY[char_lower])
                 if char.isupper():
                     replacement = replacement.upper()
-                chars[idx] = replacement
-                modifications.append({"pos": str(idx), "original": char, "replaced_with": replacement, "type": "typo"})
-            elif mutation_type == "drop" and len(chars) > 10:
-                del chars[idx]
-                modifications.append({"pos": str(idx), "original": char, "replaced_with": "", "type": "drop"})
-            elif mutation_type == "swap" and idx < len(chars) - 1:
-                chars[idx], chars[idx + 1] = chars[idx + 1], chars[idx]
-                modifications.append({"pos": str(idx), "type": "transposition"})
+                chars[char_idx] = replacement
+            elif mutation_type == "drop" and len(chars) > 3:
+                del chars[char_idx]
+            elif mutation_type == "swap" and len(chars) > 2:
+                swap_idx = char_idx if char_idx < len(chars) - 1 else char_idx - 1
+                chars[swap_idx], chars[swap_idx + 1] = chars[swap_idx + 1], chars[swap_idx]
             elif mutation_type == "duplicate" and char.isalpha():
-                chars.insert(idx, char)
-                modifications.append({"pos": str(idx), "type": "duplicate"})
+                chars.insert(char_idx, char)
+            elif char_lower in KEYBOARD_ADJACENCY:
+                replacement = random.choice(KEYBOARD_ADJACENCY[char_lower])
+                if char.isupper():
+                    replacement = replacement.upper()
+                chars[char_idx] = replacement
 
-        res = "".join(chars)
+            corrupted_word = "".join(chars)
+            if corrupted_word != orig_word:
+                start, end = match.start(), match.end()
+                modified_text = modified_text[:start] + corrupted_word + modified_text[end:]
+                modifications.append({
+                    "original": orig_word,
+                    "corrupted_word": corrupted_word,
+                    "replaced_with": corrupted_word,
+                    "type": "typo"
+                })
+
         if intensity > 0.6 and random.random() < (intensity - 0.5):
-            cutoff = int(len(res) * random.uniform(0.5, 0.85))
-            res = res[:cutoff] + "..."
+            cutoff = int(len(modified_text) * random.uniform(0.65, 0.9))
+            modified_text = modified_text[:cutoff] + "..."
             modifications.append({"type": "truncation", "cutoff": str(cutoff)})
 
-        return res, modifications
+        return modified_text, modifications
 
     def apply_formality_shift(self, text: str, intensity: float) -> Tuple[str, List[Dict[str, str]]]:
         """
@@ -300,7 +333,14 @@ class DriftEngine:
                 if matches:
                     modified_text, count = re.subn(pattern, replacement, modified_text, flags=re.IGNORECASE)
                     if count > 0:
-                        modifications.append({"pattern": pattern, "replacement": replacement, "count": count, "type": "slang_shift"})
+                        modifications.append({
+                            "pattern": pattern,
+                            "original": pattern.replace(r"\b", ""),
+                            "replaced_with": replacement,
+                            "replacement": replacement,
+                            "count": count,
+                            "type": "slang_shift"
+                        })
 
         return modified_text, modifications
 

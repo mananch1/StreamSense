@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=20260903_v5" />
 </head>
 <body class="dark-theme">
   <!-- Top App Header -->
@@ -231,7 +231,14 @@
 
       <div class="feed-column-bar">
         <div class="feed-bar-left">Original Input (Amazon Review)</div>
-        <div class="feed-bar-right">Drifted Stream (Fed into Social App)</div>
+        <div class="feed-bar-right">
+          <span>Drifted Stream (Social App)</span>
+          <div class="drift-legend">
+            <span class="legend-item"><span class="legend-dot dot-purple"></span>Antonym</span>
+            <span class="legend-item"><span class="legend-dot dot-cyan"></span>Slang</span>
+            <span class="legend-item"><span class="legend-dot dot-green"></span>Typo</span>
+          </div>
+        </div>
       </div>
 
       <div class="feed-scroll-area" id="feedCardsContainer">
@@ -316,6 +323,6 @@
 
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20260903_v5"></script>
 </body>
 </html>

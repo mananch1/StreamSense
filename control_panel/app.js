@@ -256,20 +256,18 @@ function renderFeedCard(item) {
   // Active drift chips
   let chipsHtml = '';
   if (item.active_drifts && item.active_drifts.length > 0) {
-    chipsHtml = item.active_drifts.map(d => `<span class="chip ${d.includes('Adjective') ? 'semantic' : ''}">${d}</span>`).join('');
+    chipsHtml = item.active_drifts.map(d => {
+      let chipClass = 'chip';
+      if (d.includes('Adjective')) chipClass += ' semantic';
+      else if (d.includes('Slang') || d.includes('Formality')) chipClass += ' slang';
+      else if (d.includes('Noise')) chipClass += ' noise';
+      return `<span class="${chipClass}">${escapeHtml(d)}</span>`;
+    }).join('');
   }
 
-  // Highlight word substitutions
-  let highlightedDriftText = escapeHtml(item.drifted_text);
-  if (item.modifications && item.modifications.length > 0) {
-    item.modifications.forEach(mod => {
-      if (mod.replaced_with && mod.replaced_with.length > 0) {
-        const escapedSub = escapeHtml(mod.replaced_with);
-        const regex = new RegExp(`\\b${escapeRegExp(escapedSub)}\\b`, 'gi');
-        highlightedDriftText = highlightedDriftText.replace(regex, `<span class="highlight-swap">${escapedSub}</span>`);
-      }
-    });
-  }
+  // Highlight word substitutions (Semantic antonyms & Slang shift)
+  const highlightedDriftSummary = highlightSubstitutions(item.drifted_summary, item.modifications);
+  const highlightedDriftText = highlightSubstitutions(item.drifted_text, item.modifications);
 
   card.innerHTML = `
     <!-- Left: Original -->
@@ -290,7 +288,7 @@ function renderFeedCard(item) {
           ${driftStars} (${item.drifted_score}★) ${isScoreShifted ? '⚠️' : ''}
         </span>
       </div>
-      <div class="card-sum">${escapeHtml(item.drifted_summary)}</div>
+      <div class="card-sum">${highlightedDriftSummary}</div>
       <div class="card-body">${highlightedDriftText}</div>
       <div class="chips-row">${chipsHtml}</div>
     </div>
@@ -302,6 +300,80 @@ function renderFeedCard(item) {
   while (el.feedCardsContainer.children.length > 35) {
     el.feedCardsContainer.removeChild(el.feedCardsContainer.lastChild);
   }
+}
+
+function highlightSubstitutions(text, modifications) {
+  if (!text) return '';
+  let safeText = escapeHtml(text);
+  if (!modifications || modifications.length === 0) {
+    return safeText;
+  }
+
+  // Filter semantic adjective swaps, slang shifts, and typo-corrupted words (len > 1)
+  const validMods = modifications.filter(m => {
+    const isTargetType = (m.type === 'adjective_swap' || m.type === 'slang_shift' || m.type === 'typo');
+    const word = (m.corrupted_word || m.replaced_with || m.replacement || '').trim();
+    return isTargetType && word.length > 1;
+  });
+
+  if (validMods.length === 0) {
+    return safeText;
+  }
+
+  // Deduplicate and sort by length descending so longer phrases match first
+  const seen = new Set();
+  const sortedMods = [];
+  for (const mod of validMods) {
+    const word = (mod.corrupted_word || mod.replaced_with || mod.replacement || '').trim();
+    const key = `${mod.type}:${word.toLowerCase()}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      let cssClass = 'highlight-swap';
+      if (mod.type === 'slang_shift') {
+        cssClass = 'highlight-slang';
+      } else if (mod.type === 'typo') {
+        cssClass = 'highlight-typo';
+      }
+
+      sortedMods.push({
+        word: word,
+        type: mod.type,
+        cssClass: cssClass
+      });
+    }
+  }
+
+  sortedMods.sort((a, b) => {
+    if (b.word.length !== a.word.length) {
+      return b.word.length - a.word.length;
+    }
+    const prio = { 'typo': 1, 'slang_shift': 2, 'adjective_swap': 3 };
+    return (prio[a.type] || 9) - (prio[b.type] || 9);
+  });
+
+  for (const item of sortedMods) {
+    const regex = createWordRegex(item.word);
+    const parts = safeText.split(/(<[^>]+>)/g);
+    for (let i = 0; i < parts.length; i++) {
+      if (!parts[i].startsWith('<')) {
+        parts[i] = parts[i].replace(regex, (match) => `<span class="${item.cssClass}">${match}</span>`);
+      }
+    }
+    safeText = parts.join('');
+  }
+
+  return safeText;
+}
+
+function createWordRegex(phrase) {
+  const safePhrase = escapeHtml(phrase);
+  const escaped = escapeRegExp(safePhrase);
+  const startsWithWord = /^\w/.test(phrase);
+  const endsWithWord = /\w$/.test(phrase);
+
+  const prefix = startsWithWord ? '\\b' : '(?:^|(?<=[\\s\\W]))';
+  const suffix = endsWithWord ? '\\b' : '(?=[\\s\\W]|$)';
+  return new RegExp(`${prefix}${escaped}${suffix}`, 'gi');
 }
 
 // ==========================================
