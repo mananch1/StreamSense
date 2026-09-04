@@ -90,9 +90,16 @@ class TestStreamSenseDrift(unittest.TestCase):
         metrics = calc.compute_window_metrics(window)
         
         self.assertIn("cosine_similarity", metrics)
+        self.assertIn("pairwise_cosine_similarity", metrics)
         self.assertIn("vocab_overlap", metrics)
         self.assertIn("sentiment_kl_divergence", metrics)
+        self.assertIn("sentiment_js_divergence", metrics)
+        self.assertIn("sentiment_wasserstein_distance", metrics)
+        self.assertIn("character_mutation_rate", metrics)
         self.assertIn("drift_magnitude_pct", metrics)
+        self.assertLess(metrics["cosine_similarity"], 1.0)
+        self.assertGreaterEqual(metrics["sentiment_js_divergence"], 0.0)
+        self.assertLessEqual(metrics["sentiment_js_divergence"], 1.0)
         print(f"\n[Test Drift Metrics]\n  Metrics: {metrics}")
 
 if __name__ == "__main__":
