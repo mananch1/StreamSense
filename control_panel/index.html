@@ -94,6 +94,14 @@
               <input type="number" id="windowTimeInput" class="compact-input" min="2" max="120" value="15" />
             </div>
           </div>
+
+          <div class="cfg-row" style="margin-top: 10px;">
+            <div class="cfg-label-val">
+              <label for="burnInSlider">Baseline Burn-In Windows</label>
+              <span id="burnInVal" class="mono-badge">3 windows</span>
+            </div>
+            <input type="range" id="burnInSlider" min="1" max="10" step="1" value="3" />
+          </div>
         </div>
 
         <!-- Section 2: Drift Dynamics Trajectory -->
@@ -262,6 +270,17 @@
 
       <div class="col-body scrollable-body">
         
+        <!-- Baseline Burn-In Calibration Status Bar -->
+        <div class="baseline-status-bar" id="baselineStatusBar" style="display:none;">
+          <div class="baseline-progress-text">
+            <span class="baseline-icon">⏳</span>
+            <span id="baselineStatusText">Calibrating Baseline...</span>
+          </div>
+          <div class="baseline-progress-bar">
+            <div class="baseline-progress-fill" id="baselineProgressFill" style="width: 0%"></div>
+          </div>
+        </div>
+
         <!-- Chart 1: Net Drift Magnitude -->
         <div class="metric-card">
           <div class="metric-card-head">
@@ -304,16 +323,24 @@
               <span class="s-val" id="lblTriggerReason">Waiting for window...</span>
             </div>
             <div class="s-item">
-              <span class="s-label">TF-IDF Cosine Sim:</span>
+              <span class="s-label">TF-IDF Cosine Sim (vs Baseline):</span>
               <span class="s-val cyan" id="lblCosineSim">1.000</span>
             </div>
             <div class="s-item">
-              <span class="s-label">Vocabulary Overlap:</span>
+              <span class="s-label">Vocab Overlap (vs Baseline):</span>
               <span class="s-val purple" id="lblVocabOverlap">100.0%</span>
             </div>
             <div class="s-item">
-              <span class="s-label">Sentiment KL-Div:</span>
+              <span class="s-label">Sentiment KL-Div (vs Baseline):</span>
               <span class="s-val emerald" id="lblKLDiv">0.000</span>
+            </div>
+            <div class="s-item">
+              <span class="s-label">Spelling Error Rate:</span>
+              <span class="s-val amber" id="lblSpellingRate">0.000</span>
+            </div>
+            <div class="s-item">
+              <span class="s-label">Score Dist Divergence:</span>
+              <span class="s-val emerald" id="lblScoreDistDiv">0.000</span>
             </div>
           </div>
         </div>

@@ -15,8 +15,8 @@ class FeedSimulator:
     def __init__(self, data_loader: DataLoader, drift_engine: DriftEngine):
         self.data_loader = data_loader
         self.drift_engine = drift_engine
-        self.metrics_calculator = DriftMetricsCalculator()
         self.config = FeedConfig()
+        self.metrics_calculator = DriftMetricsCalculator(burn_in_windows=self.config.burn_in_windows)
 
         self.is_running = False
         self.task: Optional[asyncio.Task] = None
@@ -33,6 +33,8 @@ class FeedSimulator:
 
     def update_feed_config(self, new_config: FeedConfig):
         self.config = new_config
+        if new_config.burn_in_windows != self.metrics_calculator.burn_in_windows_needed:
+            self.metrics_calculator.burn_in_windows_needed = new_config.burn_in_windows
         if new_config.dataset_mode != self.data_loader.mode:
             self.data_loader.mode = new_config.dataset_mode
             self.data_loader.reload_data()
@@ -155,7 +157,7 @@ class FeedSimulator:
         self.total_windows_processed = 0
         self.data_loader.reset_cursor()
         self.drift_engine.step_count = 0
-        self.metrics_calculator = DriftMetricsCalculator()
+        self.metrics_calculator = DriftMetricsCalculator(burn_in_windows=self.config.burn_in_windows)
 
     def get_status(self) -> Dict[str, Any]:
         return {

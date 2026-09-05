@@ -35,5 +35,6 @@ class FeedConfig(BaseModel):
     messages_per_second: float = Field(2.0, ge=0.1, le=50.0)
     window_message_count: int = Field(25, ge=5, le=500, description="Window size N (messages)")
     window_time_seconds: float = Field(15.0, ge=1.0, le=300.0, description="Window timeout T (seconds)")
+    burn_in_windows: int = Field(3, ge=1, le=10, description="Number of initial clean windows to establish baseline profile")
     dataset_mode: Literal["sample", "full"] = "sample"
     is_running: bool = False

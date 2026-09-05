@@ -862,6 +862,40 @@ input:checked + .switch-slider:before {
 .s-val.cyan { color: var(--cyan); }
 .s-val.purple { color: var(--purple); }
 .s-val.emerald { color: var(--emerald); }
+.s-val.amber { color: var(--amber); }
+
+/* Baseline Burn-In Status Bar */
+.baseline-status-bar {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.baseline-progress-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--amber);
+  margin-bottom: 8px;
+}
+
+.baseline-progress-bar {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.baseline-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--amber), #fbbf24);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
 
 /* Scrollbars */
 ::-webkit-scrollbar {

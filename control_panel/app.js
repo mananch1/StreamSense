@@ -60,7 +60,16 @@ const el = {
   lblTriggerReason: document.getElementById('lblTriggerReason'),
   lblCosineSim: document.getElementById('lblCosineSim'),
   lblVocabOverlap: document.getElementById('lblVocabOverlap'),
-  lblKLDiv: document.getElementById('lblKLDiv')
+  lblKLDiv: document.getElementById('lblKLDiv'),
+  lblSpellingRate: document.getElementById('lblSpellingRate'),
+  lblScoreDistDiv: document.getElementById('lblScoreDistDiv'),
+
+  // Baseline Burn-In Elements
+  burnInSlider: document.getElementById('burnInSlider'),
+  burnInVal: document.getElementById('burnInVal'),
+  baselineStatusBar: document.getElementById('baselineStatusBar'),
+  baselineStatusText: document.getElementById('baselineStatusText'),
+  baselineProgressFill: document.getElementById('baselineProgressFill')
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -380,6 +389,26 @@ function createWordRegex(phrase) {
 // Update Analytics Dashboard Charts
 // ==========================================
 function updateMetricsDashboard(metrics) {
+  // Handle burn-in vs monitoring phase
+  if (metrics.phase === 'burn_in') {
+    if (el.baselineStatusBar) el.baselineStatusBar.style.display = 'block';
+    if (el.baselineStatusText) el.baselineStatusText.textContent = `Calibrating Baseline (${metrics.burn_in_progress})...`;
+    if (metrics.burn_in_progress && el.baselineProgressFill) {
+      const [current, total] = metrics.burn_in_progress.split('/').map(Number);
+      el.baselineProgressFill.style.width = `${Math.min(100, Math.round((current / (total || 1)) * 100))}%`;
+    }
+    if (el.lblTriggerReason) el.lblTriggerReason.textContent = metrics.trigger_reason || 'Burn-in calibration';
+    if (el.lblCosineSim) el.lblCosineSim.textContent = '1.000';
+    if (el.lblVocabOverlap) el.lblVocabOverlap.textContent = '100.0%';
+    if (el.lblKLDiv) el.lblKLDiv.textContent = '0.000';
+    if (el.lblSpellingRate) el.lblSpellingRate.textContent = metrics.spelling_error_rate ? metrics.spelling_error_rate.toFixed(3) : '0.000';
+    if (el.lblScoreDistDiv) el.lblScoreDistDiv.textContent = '0.000';
+    return; // Don't update drift charts during burn-in
+  }
+
+  // Baseline is ready — hide status bar
+  if (el.baselineStatusBar) el.baselineStatusBar.style.display = 'none';
+
   const timestamp = metrics.timestamp || new Date().toLocaleTimeString();
 
   el.statDriftScore.textContent = `${metrics.drift_magnitude_pct}%`;
@@ -388,11 +417,16 @@ function updateMetricsDashboard(metrics) {
   el.lblVocabOverlap.textContent = `${(metrics.vocab_overlap * 100).toFixed(1)}%`;
   el.lblKLDiv.textContent = metrics.sentiment_kl_divergence.toFixed(3);
 
+  // Update new reference-free metric labels
+  if (el.lblSpellingRate) el.lblSpellingRate.textContent = metrics.spelling_error_rate.toFixed(3);
+  if (el.lblScoreDistDiv) el.lblScoreDistDiv.textContent = metrics.score_dist_divergence.toFixed(3);
+
   appendChartData(chartMagnitude, timestamp, [metrics.drift_magnitude_pct]);
   appendChartData(chartSimilarity, timestamp, [metrics.cosine_similarity, metrics.vocab_overlap]);
 
-  const posPct = (metrics.drifted_sentiment_dist?.positive || 0);
-  const negPct = (metrics.drifted_sentiment_dist?.negative || 0);
+  const sentDist = metrics.current_sentiment_dist || metrics.drifted_sentiment_dist || {};
+  const posPct = (sentDist.positive || 0);
+  const negPct = (sentDist.negative || 0);
   appendChartData(chartSentiment, timestamp, [posPct, negPct, metrics.sentiment_kl_divergence]);
 }
 
@@ -437,6 +471,12 @@ function bindControlEvents() {
     el.speedVal.textContent = `${parseFloat(el.speedSlider.value).toFixed(1)} msgs/s`;
     syncFeedConfig();
   });
+  if (el.burnInSlider) {
+    el.burnInSlider.addEventListener('input', () => {
+      if (el.burnInVal) el.burnInVal.textContent = `${el.burnInSlider.value} windows`;
+      syncFeedConfig();
+    });
+  }
 
   [
     el.toggleAdjSwap, el.toggleClassSwap, el.toggleClassShift,
@@ -469,6 +509,10 @@ function bindControlEvents() {
     el.statStreamedCount.textContent = '0';
     el.statWindowsCount.textContent = '0';
     el.statDriftScore.textContent = '0.0%';
+    if (el.baselineStatusBar) el.baselineStatusBar.style.display = 'none';
+    if (el.baselineProgressFill) el.baselineProgressFill.style.width = '0%';
+    if (el.lblSpellingRate) el.lblSpellingRate.textContent = '0.000';
+    if (el.lblScoreDistDiv) el.lblScoreDistDiv.textContent = '0.000';
     el.feedCardsContainer.innerHTML = `
       <div class="empty-feed-placeholder" id="feedEmptyState">
         <div class="empty-icon">📡</div>
@@ -533,7 +577,8 @@ async function syncFeedConfig() {
   const payload = {
     messages_per_second: parseFloat(el.speedSlider.value),
     window_message_count: parseInt(el.windowCountInput.value),
-    window_time_seconds: parseFloat(el.windowTimeInput.value)
+    window_time_seconds: parseFloat(el.windowTimeInput.value),
+    burn_in_windows: parseInt(el.burnInSlider ? el.burnInSlider.value : 3)
   };
 
   await fetch('/api/feed/configure', {
@@ -550,6 +595,10 @@ async function fetchInitialStatus() {
     setStreamingUI(data.is_running);
     if (data.dataset_info?.target_asin) {
       el.activeAsin.textContent = data.dataset_info.target_asin;
+    }
+    if (data.config?.burn_in_windows && el.burnInSlider) {
+      el.burnInSlider.value = data.config.burn_in_windows;
+      if (el.burnInVal) el.burnInVal.textContent = `${data.config.burn_in_windows} windows`;
     }
   } catch (e) {
     console.error("Could not fetch status:", e);

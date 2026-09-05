@@ -28,27 +28,33 @@ Incorporates drift generation paradigms from [Garcia et al. (2024), *Methods for
 
 ### 3. Real-Time Drift Metrics & Statistical Formulations
 
-StreamSense implements multi-layer drift detection spanning syntactic, semantic, lexical, and distributional divergence across tumbling/sliding stream windows:
+StreamSense operates in a **reference-free, baseline-windowed** mode where the metrics engine monitors incoming stream windows directly against a frozen reference profile established during an initial burn-in period:
 
 | Metric | Domain / Range | Mathematical Formulation | Statistical Role & Interpretation |
 |---|---|---|---|
-| **Centroid TF-IDF Cosine Similarity** | $[0.0, 1.0]$ | $\text{Sim}_{\text{centroid}} = \frac{\boldsymbol{\mu}_{\text{orig}} \cdot \boldsymbol{\mu}_{\text{drift}}}{\|\boldsymbol{\mu}_{\text{orig}}\|_2 \|\boldsymbol{\mu}_{\text{drift}}\|_2}$ | Measures angular divergence between window mean TF-IDF centroids $\boldsymbol{\mu} = \frac{1}{N}\sum \mathbf{x}_i$. Values $< 1.0$ indicate semantic term displacement. |
-| **Pairwise Cosine Similarity** | $[0.0, 1.0]$ | $\text{Sim}_{\text{pair}} = \frac{1}{N}\sum_{i=1}^N \frac{\mathbf{x}_i \cdot \mathbf{x}'_i}{\|\mathbf{x}_i\|_2 \|\mathbf{x}'_i\|_2}$ | Measures instance-by-instance perturbation severity between paired original review $\mathbf{x}_i$ and drifted review $\mathbf{x}'_i$. |
-| **Vocabulary Jaccard Overlap** | $[0.0, 1.0]$ | $J(V_{\text{orig}}, V_{\text{drift}}) = \frac{\|V_{\text{orig}} \cap V_{\text{drift}}\|}{\|V_{\text{orig}} \cup V_{\text{drift}}\|}$ | Quantifies lexical retention vs Out-of-Vocabulary (OOV) expansion across alphabetic token sets $V$. |
+| **Centroid TF-IDF Cosine Similarity** | $[0.0, 1.0]$ | $\text{Sim}_{\text{centroid}} = \frac{\boldsymbol{\mu}_{\text{baseline}} \cdot \boldsymbol{\mu}_{\text{curr}}}{\|\boldsymbol{\mu}_{\text{baseline}}\|_2 \|\boldsymbol{\mu}_{\text{curr}}\|_2}$ | Measures angular divergence between the frozen baseline centroid $\boldsymbol{\mu}_{\text{baseline}}$ and the current window centroid $\boldsymbol{\mu}_{\text{curr}}$. Values $< 1.0$ indicate semantic vocabulary displacement. |
+| **Vocabulary Jaccard Overlap** | $[0.0, 1.0]$ | $J(V_{\text{baseline}}, V_{\text{curr}}) = \frac{\|V_{\text{baseline}} \cap V_{\text{curr}}\|}{\|V_{\text{baseline}} \cup V_{\text{curr}}\|}$ | Quantifies lexical retention vs Out-of-Vocabulary (OOV) expansion against the union of all vocabulary observed during burn-in. |
 | **Sentiment Polarity Distribution** | $\Delta^2$ Simplex | $P(c) = \frac{1}{N}\sum_{i=1}^N \mathbb{I}(\text{VADER}(t_i) \in c)$ | Categorical sentiment distribution across classes $c \in \{\text{positive}, \text{neutral}, \text{negative}\}$ using VADER compound polarity thresholds ($\ge 0.05, \le -0.05$). |
-| **Kullback-Leibler (KL) Divergence** | $[0.0, +\infty)$ | $D_{\text{KL}}(P \parallel Q) = \sum_{c} P(c) \ln \frac{P(c)}{Q(c)}$ | Information-theoretic relative entropy from reference distribution $P$ to drifted distribution $Q$ (with Laplace/epsilon smoothing). |
-| **Jensen-Shannon Divergence (JSD)** | $[0.0, 1.0]$ | $\text{JSD}(P \parallel Q) = \frac{1}{2} D_{\text{KL}}(P \parallel M) + \frac{1}{2} D_{\text{KL}}(Q \parallel M)$ | Symmetric, strictly bounded divergence where $M = \frac{1}{2}(P + Q)$. Its square root $\sqrt{\text{JSD}}$ is a true metric satisfying the triangle inequality. |
-| **Sentiment Wasserstein-1 Distance** | $[0.0, 2.0]$ | $W_1(P, Q) = \sum_{k} \|F_P(k) - F_Q(k)\|$ | Earth Mover's Distance over ordered sentiment states ($\text{neg} < \text{neu} < \text{pos}$). Penalizes polarity reversals ($\text{pos} \leftrightarrow \text{neg}$) twice as heavily as neutrality shifts ($\text{pos} \leftrightarrow \text{neu}$). |
-| **Character Mutation Rate (CER)** | $[0.0, 1.0]$ | $\text{CER} = \frac{1}{N}\sum_{i=1}^N \frac{\text{Levenshtein}(t_i, t'_i)}{\max(\|t_i\|, 1)}$ | Normalized character edit distance capturing typographical noise, transposition, and character injection. |
-| **Average Score Delta ($\text{MAE}_{\text{score}}$)** | $[0.0, 4.0]$ | $\Delta \bar{s} = \frac{1}{N}\sum_{i=1}^N \|s_i^{\text{drift}} - s_i^{\text{orig}}\|$ | Mean absolute error on star ratings ($1\star - 5\star$) reflecting label degradation. |
-| **Composite Drift Magnitude (%)** | $[0.0\%, 100.0\%]$ | $\text{Score} = (0.35 d_{\cos} + 0.25 d_{\text{vocab}} + 0.20 \sqrt{\text{JSD}} + 0.20 \frac{\Delta \bar{s}}{4.0}) \times 100$ | Multi-criteria unified perturbation magnitude score synthesizing lexical, semantic, sentiment, and label shifts into an interpretable percentage. |
+| **Kullback-Leibler (KL) Divergence** | $[0.0, +\infty)$ | $D_{\text{KL}}(P_{\text{baseline}} \parallel Q_{\text{curr}}) = \sum_{c} P(c) \ln \frac{P(c)}{Q(c)}$ | Information-theoretic relative entropy from the baseline sentiment profile $P_{\text{baseline}}$ to the current window distribution $Q_{\text{curr}}$ (with epsilon smoothing). |
+| **Jensen-Shannon Divergence (JSD)** | $[0.0, 1.0]$ | $\text{JSD}(P \parallel Q) = \frac{1}{2} D_{\text{KL}}(P \parallel M) + \frac{1}{2} D_{\text{KL}}(Q \parallel M)$ | Symmetric, bounded divergence where $M = \frac{1}{2}(P + Q)$. Its square root $\sqrt{\text{JSD}}$ is a true metric satisfying the triangle inequality. |
+| **Sentiment Wasserstein-1 Distance** | $[0.0, 2.0]$ | $W_1(P, Q) = \sum_{k} \|F_P(k) - F_Q(k)\|$ | Earth Mover's Distance over ordered sentiment states ($\text{neg} < \text{neu} < \text{pos}$). Penalizes polarity reversals ($\text{pos} \leftrightarrow \text{neg}$) twice as heavily as neutrality shifts. |
+| **Spelling Error Rate (SER)** | $[0.0, 1.0]$ | $\text{SER} = \frac{1}{N_{\text{tokens}}}\sum_{j=1}^{N_{\text{tokens}}} \mathbb{I}(w_j \notin \text{Vocab}_{\text{en}})$ | Reference-free syntactic noise measurement via English dictionary lookup without requiring paired original text. |
+| **Score Distribution Divergence** | $[0.0, 1.0]$ | $\text{JSD}(S_{\text{baseline}} \parallel S_{\text{curr}})$ | Jensen-Shannon Divergence over 5-bin histogram of star ratings ($1.0\star - 5.0\star$) detecting rating drift and label inversion. |
+| **Composite Drift Magnitude (%)** | $[0.0\%, 100.0\%]$ | $\text{Score} = (0.30 d_{\cos} + 0.20 d_{\text{vocab}} + 0.20 \sqrt{\text{JSD}} + 0.15 \Delta_{\text{SER}} + 0.15 \text{JSD}_{\text{score}}) \times 100$ | Multi-criteria unified perturbation magnitude synthesizing semantic, lexical, sentiment, syntactic, and score shifts into an interpretable percentage. |
+
+> **Note on Deprecated Paired Metrics**: Pairwise Cosine Similarity, Character Mutation Rate (CER via Levenshtein edit distance), and Average Score Delta (MAE) are deprecated and removed from active monitoring because they require clean parallel reference text, which is unavailable in real-world streaming deployments. They are retained in the codebase for offline benchmarking and ablation studies.
+
+### 4. Reference-Free Detection Architecture
+- **Burn-In Calibration**: The engine establishes a reference baseline profile across $B$ clean initial windows (default: 3 windows, configurable 1–10 via the control panel).
+- **Frozen Baseline Strategy**: Once calibrated, the baseline profile is permanently frozen. It is **never** updated with subsequent windows, completely avoiding the "boiling frog" vulnerability where gradual semantic drift adapts the baseline unnoticed.
+- **Side-by-Side Educational UI**: The frontend maintains a side-by-side stream comparison (Original vs Drifted) for educational and interactive demonstration purposes, while the underlying metrics engine operates reference-free.
 
 ---
 
 ## 📊 Dataset: Stanford SNAP Amazon Movie Reviews
 - **Source**: [Stanford SNAP Amazon Movie Reviews](https://snap.stanford.edu/data/web-Movies.html) (~8 million reviews)
 - **Top Product Extracted**: `B002QZ1RS6` (*Beachbody INSANITY Series* — 957 detailed long-form reviews)
-- **Hidden Ground Truth**: Review star ratings ($1.0 - 5.0\star$) are stripped from the downstream consumer feed and preserved internally to measure accuracy degradation over time.
+- **Stream Visibility**: Review items streamed through the feed simulator include both fields for dashboard display, but the metrics engine strictly inspects only the streamed/drifted text and score.
 
 ---
 
