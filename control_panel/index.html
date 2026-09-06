@@ -224,6 +224,41 @@
 
         </div>
 
+        <!-- Section 4: MLOps Model Observability & Retraining -->
+        <div class="cfg-section mlops-section">
+          <div class="cfg-section-title">MLOps Model Observability</div>
+          
+          <div class="model-lifecycle-box">
+            <div class="model-lifecycle-head">
+              <div class="model-ver-badge" id="modelVerBadge">Model v1.0</div>
+              <span class="model-status-pill calibrating" id="modelStatusPill">CALIBRATING</span>
+            </div>
+
+            <div class="model-metrics-mini">
+              <div class="mini-stat">
+                <span class="mini-lbl">Window Accuracy</span>
+                <span class="mini-val emerald" id="lblModelWinAcc">--%</span>
+              </div>
+              <div class="mini-stat">
+                <span class="mini-lbl">Cumulative Acc</span>
+                <span class="mini-val cyan" id="lblModelCumAcc">--%</span>
+              </div>
+              <div class="mini-stat">
+                <span class="mini-lbl">Corpus Buffered</span>
+                <span class="mini-val purple" id="lblCorpusSize">0 msgs</span>
+              </div>
+            </div>
+
+            <div class="retrain-action-box">
+              <button id="btnRetrainModel" class="btn btn-retrain">
+                <span class="retrain-icon">🔄</span>
+                <span>Retrain Model on Stream Data</span>
+              </button>
+              <div class="retrain-sub-info" id="retrainSubInfo">Retrains sentiment analyzer on recent drifted samples</div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </aside>
 
@@ -281,11 +316,11 @@
           </div>
         </div>
 
-        <!-- Chart 1: Net Drift Magnitude -->
+        <!-- Chart 1: Net Drift Magnitude & Model Accuracy -->
         <div class="metric-card">
           <div class="metric-card-head">
-            <strong>Composite Drift Magnitude (%)</strong>
-            <span class="m-sub">Weighted distance</span>
+            <strong>Drift Magnitude vs Model Accuracy (%)</strong>
+            <span class="m-sub">Amber: Drift % &nbsp;|&nbsp; Emerald: Model Acc %</span>
           </div>
           <div class="chart-canvas-box">
             <canvas id="chartMagnitude"></canvas>
@@ -341,6 +376,14 @@
             <div class="s-item">
               <span class="s-label">Score Dist Divergence:</span>
               <span class="s-val emerald" id="lblScoreDistDiv">0.000</span>
+            </div>
+            <div class="s-item">
+              <span class="s-label">Model Win Accuracy:</span>
+              <span class="s-val emerald" id="lblSummaryModelAcc">100.0%</span>
+            </div>
+            <div class="s-item">
+              <span class="s-label">Model Version:</span>
+              <span class="s-val cyan" id="lblSummaryModelVer">v1.0</span>
             </div>
           </div>
         </div>

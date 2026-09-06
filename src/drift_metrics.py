@@ -78,6 +78,7 @@ class DriftMetricsCalculator:
 
         # Accumulated baseline data (collected during burn-in, frozen after)
         self._baseline_texts: List[str] = []
+        self._baseline_scores: List[float] = []
         self._baseline_vocab: set = set()
         self._baseline_sentiment_counts: Dict[str, int] = {"positive": 0, "neutral": 0, "negative": 0}
         self._baseline_sentiment_total: int = 0
@@ -97,6 +98,7 @@ class DriftMetricsCalculator:
         self.burn_in_windows_collected = 0
         self.baseline_ready = False
         self._baseline_texts = []
+        self._baseline_scores = []
         self._baseline_vocab = set()
         self._baseline_sentiment_counts = {"positive": 0, "neutral": 0, "negative": 0}
         self._baseline_sentiment_total = 0
@@ -138,8 +140,9 @@ class DriftMetricsCalculator:
         # PHASE 1: BURN-IN CALIBRATION
         # ----------------------------------------------------
         if not self.baseline_ready:
-            # 1. Accumulate raw texts
+            # 1. Accumulate raw texts and scores
             self._baseline_texts.extend(stream_texts)
+            self._baseline_scores.extend(stream_scores)
 
             # 2. Accumulate vocabulary
             for t in stream_texts:
@@ -312,6 +315,79 @@ class DriftMetricsCalculator:
             else 0.0
         )
 
+        self.baseline_ready = True
+
+    def calibrate_baseline_from_data(self, texts: List[str], scores: List[float]):
+        """
+        Re-calibrates the frozen reference baseline from a new corpus of texts and scores
+        (e.g., when the downstream model is retrained on accumulated stream data).
+        This ensures that the baseline reflects the exact distribution the model was last trained on,
+        so subsequent drift measures deviation from the newly deployed model's reference state.
+        """
+        if not texts or not scores:
+            return
+
+        self._baseline_texts = list(texts)
+        self._baseline_scores = list(scores)
+
+        # Recompute baseline vocabulary
+        self._baseline_vocab = set()
+        for t in texts:
+            tokens = re.findall(r'\b[a-zA-Z]{3,}\b', t.lower())
+            self._baseline_vocab.update(tokens)
+
+        # Recompute sentiment distribution
+        self._baseline_sentiment_counts = {"positive": 0, "neutral": 0, "negative": 0}
+        self._baseline_sentiment_total = 0
+        for t in texts:
+            if not t.strip():
+                self._baseline_sentiment_counts["neutral"] += 1
+            else:
+                vs = vader_analyzer.polarity_scores(t)
+                cmp = vs['compound']
+                if cmp >= 0.05:
+                    self._baseline_sentiment_counts["positive"] += 1
+                elif cmp <= -0.05:
+                    self._baseline_sentiment_counts["negative"] += 1
+                else:
+                    self._baseline_sentiment_counts["neutral"] += 1
+            self._baseline_sentiment_total += 1
+
+        tot_sent = max(1, self._baseline_sentiment_total)
+        self._baseline_sentiment_dist = {
+            k: round(self._baseline_sentiment_counts.get(k, 0) / tot_sent, 4)
+            for k in ["positive", "neutral", "negative"]
+        }
+
+        # Recompute score distribution
+        self._baseline_score_counts = {}
+        self._baseline_score_total = 0
+        for s in scores:
+            key = str(float(min(5.0, max(1.0, round(s)))))
+            self._baseline_score_counts[key] = self._baseline_score_counts.get(key, 0) + 1
+            self._baseline_score_total += 1
+
+        tot_score = max(1, self._baseline_score_total)
+        self._baseline_score_dist = {
+            k: round(self._baseline_score_counts.get(k, 0) / tot_score, 4)
+            for k in ["1.0", "2.0", "3.0", "4.0", "5.0"]
+        }
+
+        # Refit TF-IDF vectorizer and centroid on the new baseline
+        try:
+            self._baseline_vectorizer = TfidfVectorizer(max_features=2000, stop_words='english')
+            tfidf_mat = self._baseline_vectorizer.fit_transform(self._baseline_texts)
+            self._baseline_centroid = np.asarray(tfidf_mat.mean(axis=0))
+        except Exception:
+            self._baseline_vectorizer = None
+            self._baseline_centroid = None
+
+        # Recompute baseline spelling error rate
+        self._baseline_spelling_error_rate = self._compute_spelling_error_rate(texts)
+        self._baseline_spelling_error_rates = [self._baseline_spelling_error_rate]
+
+        # Ensure engine is in monitoring phase against this new baseline
+        self.burn_in_windows_collected = self.burn_in_windows_needed
         self.baseline_ready = True
 
     def _empty_metrics(self) -> Dict[str, Any]:

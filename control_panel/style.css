@@ -915,3 +915,204 @@ input:checked + .switch-slider:before {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
+
+/* =======================================================
+   MLOps Model Lifecycle & Inference Observability Styles
+   ======================================================= */
+
+.mlops-section {
+  margin-top: 14px;
+}
+
+.model-lifecycle-box {
+  background: rgba(16, 185, 129, 0.04);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.model-lifecycle-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.model-ver-badge {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--emerald);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+}
+
+.model-status-pill {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.model-status-pill.healthy {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.model-status-pill.at_risk {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+}
+
+.model-status-pill.degraded {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.3);
+  animation: pulse-degraded 1.5s infinite;
+}
+
+.model-status-pill.calibrating {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-dim);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+@keyframes pulse-degraded {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.model-metrics-mini {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  border: 1px solid var(--border-dim);
+}
+
+.mini-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mini-lbl {
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.mini-val {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.mini-val.emerald { color: var(--emerald); }
+.mini-val.cyan { color: var(--cyan); }
+.mini-val.purple { color: var(--purple); }
+
+.retrain-action-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.btn-retrain {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(56, 189, 248, 0.2));
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #f8fafc;
+  font-weight: 600;
+  font-size: 0.74rem;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-retrain:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.35), rgba(56, 189, 248, 0.35));
+  border-color: var(--emerald);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-retrain:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-retrain.loading .retrain-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+.retrain-sub-info {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+/* Review Card Model Prediction Chip */
+.card-model-pred {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin-top: 6px;
+}
+
+.card-model-pred.pred-match {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+
+.card-model-pred.pred-match .pred-status-icon {
+  color: var(--emerald);
+  font-weight: 800;
+}
+
+.card-model-pred.pred-mismatch {
+  background: rgba(244, 63, 94, 0.1);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #fda4af;
+}
+
+.card-model-pred.pred-mismatch .pred-status-icon {
+  color: var(--rose);
+  font-weight: 800;
+}
+
+.pred-divider {
+  opacity: 0.3;
+}
+
+.pred-actual {
+  color: var(--text-dim);
+}

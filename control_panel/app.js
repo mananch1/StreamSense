@@ -69,7 +69,18 @@ const el = {
   burnInVal: document.getElementById('burnInVal'),
   baselineStatusBar: document.getElementById('baselineStatusBar'),
   baselineStatusText: document.getElementById('baselineStatusText'),
-  baselineProgressFill: document.getElementById('baselineProgressFill')
+  baselineProgressFill: document.getElementById('baselineProgressFill'),
+
+  // MLOps & Model Observability Elements
+  modelVerBadge: document.getElementById('modelVerBadge'),
+  modelStatusPill: document.getElementById('modelStatusPill'),
+  lblModelWinAcc: document.getElementById('lblModelWinAcc'),
+  lblModelCumAcc: document.getElementById('lblModelCumAcc'),
+  lblCorpusSize: document.getElementById('lblCorpusSize'),
+  btnRetrainModel: document.getElementById('btnRetrainModel'),
+  retrainSubInfo: document.getElementById('retrainSubInfo'),
+  lblSummaryModelAcc: document.getElementById('lblSummaryModelAcc'),
+  lblSummaryModelVer: document.getElementById('lblSummaryModelVer')
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -104,22 +115,34 @@ function initCharts() {
     }
   };
 
-  // 1. Composite Drift Magnitude Chart
+  // 1. Composite Drift Magnitude & Model Accuracy Chart
   const ctxMag = document.getElementById('chartMagnitude').getContext('2d');
   chartMagnitude = new Chart(ctxMag, {
     type: 'line',
     data: {
       labels: [],
-      datasets: [{
-        label: 'Net Drift %',
-        data: [],
-        borderColor: '#f59e0b',
-        backgroundColor: 'rgba(245, 158, 11, 0.12)',
-        borderWidth: 1.8,
-        fill: true,
-        tension: 0.35,
-        pointRadius: 2
-      }]
+      datasets: [
+        {
+          label: 'Net Drift %',
+          data: [],
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.12)',
+          borderWidth: 1.8,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 2
+        },
+        {
+          label: 'Model Accuracy %',
+          data: [],
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.08)',
+          borderWidth: 1.8,
+          fill: false,
+          tension: 0.35,
+          pointRadius: 2
+        }
+      ]
     },
     options: {
       ...commonOptions,
@@ -299,6 +322,7 @@ function renderFeedCard(item) {
       </div>
       <div class="card-sum">${highlightedDriftSummary}</div>
       <div class="card-body">${highlightedDriftText}</div>
+      ${renderModelPredChip(item)}
       <div class="chips-row">${chipsHtml}</div>
     </div>
   `;
@@ -421,13 +445,37 @@ function updateMetricsDashboard(metrics) {
   if (el.lblSpellingRate) el.lblSpellingRate.textContent = metrics.spelling_error_rate.toFixed(3);
   if (el.lblScoreDistDiv) el.lblScoreDistDiv.textContent = metrics.score_dist_divergence.toFixed(3);
 
-  appendChartData(chartMagnitude, timestamp, [metrics.drift_magnitude_pct]);
+  appendChartData(chartMagnitude, timestamp, [
+    metrics.drift_magnitude_pct,
+    Math.round((metrics.model_window_accuracy !== undefined ? metrics.model_window_accuracy : 1.0) * 100)
+  ]);
   appendChartData(chartSimilarity, timestamp, [metrics.cosine_similarity, metrics.vocab_overlap]);
 
   const sentDist = metrics.current_sentiment_dist || metrics.drifted_sentiment_dist || {};
   const posPct = (sentDist.positive || 0);
   const negPct = (sentDist.negative || 0);
   appendChartData(chartSentiment, timestamp, [posPct, negPct, metrics.sentiment_kl_divergence]);
+
+  // Update MLOps Model Observability Stats
+  if (metrics.model_version) {
+    if (el.modelVerBadge) el.modelVerBadge.textContent = `Model ${metrics.model_version}`;
+    if (el.lblSummaryModelVer) el.lblSummaryModelVer.textContent = metrics.model_version;
+  }
+  if (metrics.model_window_accuracy !== undefined) {
+    const winPct = `${(metrics.model_window_accuracy * 100).toFixed(1)}%`;
+    if (el.lblModelWinAcc) el.lblModelWinAcc.textContent = winPct;
+    if (el.lblSummaryModelAcc) el.lblSummaryModelAcc.textContent = winPct;
+  }
+  if (metrics.model_cumulative_accuracy !== undefined && el.lblModelCumAcc) {
+    el.lblModelCumAcc.textContent = `${(metrics.model_cumulative_accuracy * 100).toFixed(1)}%`;
+  }
+  if (metrics.accumulated_samples_count !== undefined && el.lblCorpusSize) {
+    el.lblCorpusSize.textContent = `${metrics.accumulated_samples_count} msgs`;
+  }
+  if (el.modelStatusPill && metrics.model_status) {
+    el.modelStatusPill.textContent = metrics.model_status.toUpperCase();
+    el.modelStatusPill.className = `model-status-pill ${metrics.model_status}`;
+  }
 }
 
 function appendChartData(chart, label, dataValues) {
@@ -513,6 +561,17 @@ function bindControlEvents() {
     if (el.baselineProgressFill) el.baselineProgressFill.style.width = '0%';
     if (el.lblSpellingRate) el.lblSpellingRate.textContent = '0.000';
     if (el.lblScoreDistDiv) el.lblScoreDistDiv.textContent = '0.000';
+    if (el.modelVerBadge) el.modelVerBadge.textContent = 'Model v1.0';
+    if (el.modelStatusPill) {
+      el.modelStatusPill.textContent = 'CALIBRATING';
+      el.modelStatusPill.className = 'model-status-pill calibrating';
+    }
+    if (el.lblModelWinAcc) el.lblModelWinAcc.textContent = '--%';
+    if (el.lblModelCumAcc) el.lblModelCumAcc.textContent = '--%';
+    if (el.lblCorpusSize) el.lblCorpusSize.textContent = '0 msgs';
+    if (el.lblSummaryModelAcc) el.lblSummaryModelAcc.textContent = '100.0%';
+    if (el.lblSummaryModelVer) el.lblSummaryModelVer.textContent = 'v1.0';
+    if (el.retrainSubInfo) el.retrainSubInfo.textContent = 'Retrains sentiment analyzer on recent drifted samples';
     el.feedCardsContainer.innerHTML = `
       <div class="empty-feed-placeholder" id="feedEmptyState">
         <div class="empty-icon">📡</div>
@@ -523,6 +582,39 @@ function bindControlEvents() {
     resetCharts();
     setStreamingUI(false);
   });
+
+  if (el.btnRetrainModel) {
+    el.btnRetrainModel.addEventListener('click', async () => {
+      el.btnRetrainModel.disabled = true;
+      el.btnRetrainModel.classList.add('loading');
+      if (el.retrainSubInfo) el.retrainSubInfo.textContent = 'Retraining classifier on stream corpus...';
+      try {
+        const res = await fetch('/api/model/retrain', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'trained') {
+          if (el.modelVerBadge) el.modelVerBadge.textContent = `Model ${data.version}`;
+          if (el.lblSummaryModelVer) el.lblSummaryModelVer.textContent = data.version;
+          if (el.retrainSubInfo) {
+            el.retrainSubInfo.textContent = `Active: ${data.version} (${data.sample_count} samples) • Baseline Recalibrated`;
+          }
+          if (el.modelStatusPill) {
+            el.modelStatusPill.textContent = 'HEALTHY';
+            el.modelStatusPill.className = 'model-status-pill healthy';
+          }
+        } else {
+          if (el.retrainSubInfo) el.retrainSubInfo.textContent = data.message || 'Retraining failed';
+        }
+      } catch (err) {
+        console.error('Retrain error:', err);
+        if (el.retrainSubInfo) el.retrainSubInfo.textContent = 'Failed to trigger retrain';
+      } finally {
+        setTimeout(() => {
+          el.btnRetrainModel.disabled = false;
+          el.btnRetrainModel.classList.remove('loading');
+        }, 800);
+      }
+    });
+  }
 }
 
 function updateMethodBoxStyles() {
@@ -600,9 +692,38 @@ async function fetchInitialStatus() {
       el.burnInSlider.value = data.config.burn_in_windows;
       if (el.burnInVal) el.burnInVal.textContent = `${data.config.burn_in_windows} windows`;
     }
+    if (data.model_status) {
+      if (data.model_status.version && el.modelVerBadge) {
+        el.modelVerBadge.textContent = `Model ${data.model_status.version}`;
+        if (el.lblSummaryModelVer) el.lblSummaryModelVer.textContent = data.model_status.version;
+      }
+      if (data.model_status.status && el.modelStatusPill) {
+        el.modelStatusPill.textContent = data.model_status.status.toUpperCase();
+        el.modelStatusPill.className = `model-status-pill ${data.model_status.status}`;
+      }
+    }
   } catch (e) {
     console.error("Could not fetch status:", e);
   }
+}
+
+function renderModelPredChip(item) {
+  if (!item.model_prediction || item.model_prediction === 'untrained' || item.model_prediction === 'calibrating') {
+    return '';
+  }
+  const isMatch = item.prediction_correct;
+  const badgeClass = isMatch ? 'pred-match' : 'pred-mismatch';
+  const icon = isMatch ? '✓' : '✗';
+  const confPct = Math.round((item.model_confidence || 0) * 100);
+  const ver = item.model_version || 'v1.0';
+  return `
+    <div class="card-model-pred ${badgeClass}">
+      <span class="pred-status-icon">${icon}</span>
+      <span class="pred-text"><strong>${ver}:</strong> ${item.model_prediction.toUpperCase()} (${confPct}%)</span>
+      <span class="pred-divider">|</span>
+      <span class="pred-actual">Label: <strong>${(item.ground_truth_label || '').toUpperCase()}</strong></span>
+    </div>
+  `;
 }
 
 function escapeHtml(text) {

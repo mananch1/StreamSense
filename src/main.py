@@ -108,6 +108,17 @@ async def get_dataset_meta():
     return data_loader.get_info()
 
 
+@app.post("/api/model/retrain")
+async def retrain_model():
+    res = feed_simulator.retrain_model()
+    return res
+
+
+@app.get("/api/model/status")
+async def get_model_status():
+    return feed_simulator.sentiment_model.get_status()
+
+
 @app.websocket("/ws/feed")
 async def websocket_feed_endpoint(websocket: WebSocket):
     await websocket.accept()

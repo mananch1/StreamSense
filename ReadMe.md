@@ -49,6 +49,13 @@ StreamSense operates in a **reference-free, baseline-windowed** mode where the m
 - **Frozen Baseline Strategy**: Once calibrated, the baseline profile is permanently frozen. It is **never** updated with subsequent windows, completely avoiding the "boiling frog" vulnerability where gradual semantic drift adapts the baseline unnoticed.
 - **Side-by-Side Educational UI**: The frontend maintains a side-by-side stream comparison (Original vs Drifted) for educational and interactive demonstration purposes, while the underlying metrics engine operates reference-free.
 
+### 5. Closed-Loop MLOps Pipeline: Observability & Retraining
+StreamSense closes the operational machine learning loop by tying unsupervised drift detection directly to supervised downstream model performance:
+1. **Warm-Up Training (`Model v1.0`)**: Once the clean burn-in baseline finishes, a sentiment classifier (`TfidfVectorizer` + `LogisticRegression`) is automatically trained on the initial clean reviews.
+2. **Streaming Inference & Observability**: Every incoming streamed review is evaluated by the active model. Its predicted sentiment is compared against the review's star rating proxy label (`4-5★` Positive, `3★` Neutral, `1-2★` Negative) to calculate real-time window and cumulative accuracy.
+3. **Drift Degradation Feedback**: When semantic perturbations (adjective antonym swaps, class swaps, or typographical noise) are enabled, the dashboard displays accuracy plunging from $>90\%$ to $<45\%$, visually plotted alongside rising Composite Drift Magnitude.
+4. **On-Demand Retraining (`Model v2.0+`)**: The user can trigger retraining directly from the Control Panel at any time. The engine trains an updated classifier on recent accumulated stream samples, restoring operational accuracy on the drifted distribution.
+
 ---
 
 ## 📊 Dataset: Stanford SNAP Amazon Movie Reviews
@@ -72,7 +79,7 @@ python scripts/create_subset.py
 
 ### 3. Run Unit Tests
 ```bash
-python -m unittest tests/test_drift_engine.py
+python -m unittest discover tests -v
 ```
 
 ### 4. Launch StreamSense
