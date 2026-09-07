@@ -4,7 +4,6 @@ Provides RESTful controls and real-time WebSockets for data drift simulation and
 """
 
 import os
-import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse

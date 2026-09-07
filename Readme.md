@@ -67,24 +67,41 @@ StreamSense closes the operational machine learning loop by tying unsupervised d
 
 ## 🚀 Quick Start Guide
 
-### 1. Install Dependencies
+### 1. Create Virtual Environment
+```bash
+python -m venv .venv
+```
+
+### 2. Activate the Environment
+```bash
+# Linux
+source .venv\bin\activate
+
+# Windows (CMD)
+.venv\Scripts\activate.bat
+
+# Windows (PowerShell)
+.venv\Scripts\activate.ps1
+```
+
+### 3. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. (Optional) Re-extract Dataset Subset
+### 4. (Optional) Re-extract Dataset Subset
 ```bash
 python scripts/create_subset.py
 ```
 
-### 3. Run Unit Tests
+### 5. Run Unit Tests
 ```bash
 python -m unittest discover tests -v
 ```
 
 ### 4. Launch StreamSense
 ```bash
-python -m uvicorn src.main:app --host 127.0.0.1 --port 8000 --reload
+python main.py
 ```
 Open **[http://127.0.0.1:8000](http://127.0.0.1:8000)** in your browser to access the interactive Control System & Real-Time Analytics Dashboard.
 
