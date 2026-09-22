@@ -1,0 +1,16 @@
+method,intensity,cosine_similarity,vocab_overlap,sentiment_js_divergence,spelling_error_rate,drift_magnitude_pct
+Adjective Swap,0.0,0.7441,0.2918,0.0291,0.1339,26.5
+Adjective Swap,0.25,0.7253,0.2803,0.038,0.1306,27.4
+Adjective Swap,0.5,0.7142,0.2726,0.0787,0.1307,29.6
+Adjective Swap,0.75,0.6979,0.2661,0.1699,0.1295,32.7
+Adjective Swap,1.0,0.6708,0.2546,0.225,0.1295,35.0
+Noise Injection,0.0,0.7441,0.2918,0.0291,0.1339,26.5
+Noise Injection,0.25,0.7184,0.2316,0.0677,0.2575,44.6
+Noise Injection,0.5,0.7341,0.2142,0.0204,0.3135,42.2
+Noise Injection,0.75,0.6776,0.1904,0.0617,0.3851,46.5
+Noise Injection,1.0,0.6586,0.1609,0.0291,0.441,46.1
+Formality Shift,0.0,0.7441,0.2918,0.0291,0.1339,26.5
+Formality Shift,0.25,0.7319,0.2908,0.038,0.1362,27.6
+Formality Shift,0.5,0.7063,0.2919,0.038,0.1388,28.7
+Formality Shift,0.75,0.653,0.2866,0.063,0.1442,32.1
+Formality Shift,1.0,0.6338,0.2831,0.063,0.1485,33.3

@@ -1,0 +1,6 @@
+method,cosine_similarity,vocab_overlap,sentiment_js_divergence,spelling_error_rate,score_dist_divergence
+Adjective Swap,0.1974,0.2986,0.1139,0.0088,0.0362
+Class Swap,0.1561,0.269,0.0267,0.0108,0.6118
+Class Shift,0.1561,0.269,0.0267,0.0108,0.2808
+Noise Injection,0.2066,0.3765,0.0206,0.2618,0.0362
+Formality Shift,0.2254,0.2737,0.0606,0.0227,0.0362

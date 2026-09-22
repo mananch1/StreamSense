@@ -15,6 +15,7 @@ data/movies.txt
 data/movies.txt.gz
 data/*.gz
 data/large_*.csv
+*.pdf
 
 # OS and IDE
 .DS_Store

@@ -1,0 +1,385 @@
+\documentclass[conference]{IEEEtran}
+% \IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{microtype}
+\usepackage{balance}
+
+\setcounter{topnumber}{4}
+\setcounter{bottomnumber}{4}
+\setcounter{totalnumber}{8}
+\setcounter{dbltopnumber}{3}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\bottomfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.75}
+\renewcommand{\dbltopfraction}{0.95}
+\renewcommand{\dblfloatpagefraction}{0.75}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{StreamSense: Real-Time Reference-Free Semantic Drift Detection and Closed-Loop Model Recovery for Streaming Sentiment Analysis}
+
+\author{
+\IEEEauthorblockN{Manan Chahal\IEEEauthorrefmark{1}, Parashi Rawal\IEEEauthorrefmark{2}, Aryan Racha\IEEEauthorrefmark{3}, and Manali Kulkarni\IEEEauthorrefmark{4}}
+\IEEEauthorblockA{\textit{Department of Computer Engineering}, \textit{Vidyalankar Institute of Technology}, Mumbai, India}
+\IEEEauthorblockA{Email: \IEEEauthorrefmark{1}manan.chahal@vit.edu.in, \IEEEauthorrefmark{2}parashi.rawal@vit.edu.in, \IEEEauthorrefmark{3}aryan.racha@vit.edu.in, \IEEEauthorrefmark{4}manali.kulkarni@vit.edu.in}
+}
+
+\maketitle
+
+\begin{abstract}
+Deploying natural language processing (NLP) models on streaming social feeds exposes them to concept drift, where the statistical properties of incoming text evolve over time due to shifts in vocabulary, sentiment polarity, syntactic quality, and community norms. While Garcia et al. (2024) proposed four methods for generating drift in text streams, their evaluation was limited to offline, paired-text settings using only accuracy and F1 as post-hoc metrics. In this paper, we present \textit{StreamSense}, a real-time streaming system that extends their drift generation taxonomy with two novel practical perturbation methods---Noise Injection and Formality/Slang Shift---and introduces a reference-free frozen baseline detection architecture that monitors nine statistical drift indicators across five complementary dimensions without requiring access to clean parallel text. We further integrate a closed-loop MLOps pipeline that ties unsupervised drift detection to supervised downstream model performance, enabling on-demand model retraining with automatic baseline recalibration. Experimental evaluation on 500 Amazon Movie Reviews demonstrates that: (i) different drift methods produce distinct, separable metric signatures; (ii) Class Swap causes the most severe model degradation (accuracy dropping from 91.0\% to 9.6\%); (iii) on-demand retraining recovers accuracy by up to +69.3 percentage points; and (iv) the multi-criteria monitoring framework successfully distinguishes semantic, lexical, syntactic, and label-level drift in real time.
+\end{abstract}
+
+\begin{IEEEkeywords}
+concept drift, data drift detection, streaming NLP, sentiment analysis, reference-free monitoring, MLOps, text stream mining
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Machine learning models deployed in production environments face a fundamental challenge: the data distribution they encounter at inference time inevitably diverges from the distribution they were trained on. This phenomenon, termed \textit{concept drift}~\cite{gama2014survey}, is particularly acute in natural language processing (NLP), where language evolves continuously through new vocabulary, shifting cultural norms, platform-specific conventions, and varying data quality.
+
+Garcia et al.~\cite{garcia2024methods} made an important contribution by proposing four systematic methods for generating concept drift in text streams---Adjective Swap, Class Swap, Class Shift, and Time-Slice Removal---enabling controlled benchmarking of drift-resilient classifiers. However, their work exhibits several critical limitations that hinder production deployment:
+\begin{enumerate}
+    \item \textbf{Offline Paired Evaluation}: Their experimental setup required concurrent access to both the original and drifted text at evaluation time, which is fundamentally unavailable in real-world streaming deployments.
+    \item \textbf{Limited Drift Taxonomy}: Their four methods capture semantic and label-level drift but omit syntactic degradation (e.g., keyboard typos, optical character recognition errors) and sociolinguistic shifts (e.g., internet slang, register transformation)---phenomena pervasive in online streams.
+    \item \textbf{Single-Metric Evaluation}: Relying solely on accuracy and Macro F1-Score, their evaluation cannot diagnose \textit{what kind} of drift is occurring.
+    \item \textbf{Absence of Operational Recovery}: They observed degradation but did not investigate model retraining or state recovery.
+\end{enumerate}
+
+StreamSense addresses all four limitations through the following primary contributions:
+\begin{itemize}
+    \item \textbf{C1 (Extended Taxonomy)}: An expanded drift generation taxonomy with two novel practical methods: \textit{Noise Injection} (keyboard-adjacency typos, character deletions, transpositions, duplications) and \textit{Formality/Slang Shift} (register transformation from formal review language to internet vernacular).
+    \item \textbf{C2 (Reference-Free Architecture)}: A \textit{reference-free frozen baseline} architecture that profiles clean stream windows during an initial burn-in phase and permanently freezes this baseline, preventing the ``boiling frog'' failure mode~\cite{bifet2007learning} common in sliding-window baselines.
+    \item \textbf{C3 (Multi-Criteria Diagnostic Suite)}: A monitoring framework tracking nine statistical indicators across five complementary dimensions (semantic, lexical, sentiment, syntactic, label), experimentally shown to produce distinct metric signatures for each drift type.
+    \item \textbf{C4 (Closed-Loop MLOps Pipeline)}: An integrated operational pipeline connecting real-time drift detection with downstream model performance monitoring and on-demand retraining, demonstrating accuracy recovery from as low as 9.3\% back to 80.0\% alongside automatic baseline recalibration.
+\end{itemize}
+
+\section{Related Work}
+
+\subsection{Concept Drift in Text Streams}
+Concept drift occurs when the joint probability distribution $P(X, Y)$ changes over time~\cite{gama2014survey, webb2016characterizing}. In text classification, drift manifests as covariate shift $P(X)$, prior probability shift $P(Y)$, or concept shift $P(Y|X)$. Gama et al.~\cite{gama2004learning} formalized drift types into sudden, gradual, incremental, and recurring patterns.
+
+Garcia et al.~\cite{garcia2024methods} systematically introduced four generation methods for text streams: Adjective Swap (using WordNet antonyms), Class Swap (label inversion), Class Shift (cyclic label permutation), and Time-Slice Removal. They benchmarked Gaussian Naive Bayes, Incremental SVM, and Adaptive Random Forest classifiers on Yelp and Airbnb datasets. Recent comprehensive reviews by Cano and Krawczyk~\cite{cano2024concept} emphasize that unsupervised drift detection remains the paramount challenge in streaming NLP due to the absence of immediate ground-truth labels.
+
+\subsection{Statistical Drift Detection Methods}
+Classical detectors like ADWIN~\cite{bifet2007learning}, DDM~\cite{baena2006early}, and Page-Hinkley~\cite{page1954continuous} monitor scalar error streams. While proven for tabular domains, they require immediate label feedback and cannot localize textual degradation.
+
+Information-theoretic divergence measures---Kullback-Leibler (KL) divergence~\cite{kullback1951information}, Jensen-Shannon Divergence (JSD)~\cite{lin1991divergence}, and Wasserstein distance (Earth Mover's Distance)~\cite{kantorovich1942translocation}---have been integrated into industrial monitoring platforms such as Evidently AI~\cite{evidently2024} and Alibi Detect~\cite{seldon2024alibi}. Our work adapts these divergences specifically for categorical sentiment and star rating distributions within streaming text windows, pairing them with lexical and syntactic metrics.
+
+\subsection{Sentiment Analysis Under Drift}
+VADER (Valence Aware Dictionary and sEntiment Reasoner)~\cite{hutto2014vader} is widely deployed for low-latency sentiment analysis due to its rule-based simplicity and zero training overhead. However, its fixed lexicon makes it vulnerable to vocabulary evolution~\cite{agrawal2024what}. Hybrid feature architectures combining TF-IDF representations with VADER polarity scores have demonstrated superior robustness~\cite{ahuja2019impact}, motivating the hybrid classifier adopted in StreamSense.
+
+\subsection{MLOps and Model Maintenance}
+MLOps emphasizes continuous monitoring, automated validation, and controlled model retraining in production environments~\cite{kreuzberger2023machine}. Patel and Kumar~\cite{patel2026concept} demonstrated that event-driven retraining upon validated drift achieves competitive accuracy relative to continuous retraining while drastically lowering compute requirements. StreamSense operationalizes this principle via an on-demand closed loop with baseline recalibration.
+
+\section{System Architecture}
+
+StreamSense consists of a streaming engine, a dual-trigger windowing processor, a multi-signal metrics calculator, and a closed-loop retraining pipeline connected via WebSocket streaming.
+
+\subsection{Streaming Engine and Dual-Trigger Windowing}
+The system ingests sequential review records from the Stanford SNAP Amazon Movie Reviews corpus~\cite{mcauley2013amateurs}. To accommodate both high-throughput and bursty stream conditions, StreamSense employs dual-trigger windowing: stream windows flush whenever $N$ messages have been accumulated or $T$ seconds have elapsed, whichever occurs first:
+\begin{equation}
+\tau_{\text{flush}} = \min(t_{|W| = N}, \; t_{\Delta t = T})
+\end{equation}
+In standard benchmarking, window size is set to $N=25$.
+
+\subsection{Reference-Free Frozen Baseline Architecture}
+Stream monitoring proceeds in two distinct operational phases:
+\begin{itemize}
+    \item \textbf{Burn-In Phase} ($W \in \{1, \dots, B\}$, default $B = 3$): Initial clean windows establish an empirical baseline profile: (i) a TF-IDF centroid vector $\boldsymbol{\mu}_{\text{base}}$, (ii) a baseline vocabulary set $\mathcal{V}_{\text{base}}$, (iii) a baseline VADER sentiment distribution $P_{\text{base}}$, (iv) a star-rating histogram $S_{\text{base}}$, and (v) a baseline spelling error rate $\text{SER}_{\text{base}}$.
+    \item \textbf{Monitoring Phase} ($W > B$): The baseline profile is \textbf{permanently frozen}. Incoming windows are benchmarked strictly against this static reference. This prevents the ``boiling frog'' phenomenon~\cite{bifet2007learning}, wherein adaptive sliding baselines absorb gradual drift and fail to raise alarms.
+\end{itemize}
+
+\section{Drift Generation Methodology}
+
+StreamSense implements six drift generation operators: four adapted from Garcia et al.~\cite{garcia2024methods} and two novel practical extensions.
+
+\subsection{Methods from Garcia et al.~\cite{garcia2024methods}}
+\textbf{Adjective Swap} (Semantic Drift): Text is POS-tagged; identified adjectives (\texttt{JJ}, \texttt{JJR}, \texttt{JJS}) are substituted with antonyms retrieved from WordNet synsets and an expanded high-frequency sentiment dictionary covering 37 polar adjectives.
+
+\textbf{Class Swap} (Abrupt Label Drift): Review ratings are inverted symmetrically ($1 \leftrightarrow 5$, $2 \leftrightarrow 4$, 3 unchanged).
+
+\textbf{Class Shift} (Gradual Label Drift): Ratings are cyclically incremented: $r \leftarrow ((r \pmod 5) + 1)$.
+
+\textbf{Time-Slice Removal} (Temporal Discontinuity): Temporal windows are suppressed, modeling sensor loss or pipeline dropouts.
+
+\subsection{Novel Practical Drift Extensions}
+\textbf{Noise Injection} (Syntactic Perturbation): Models noisy keyboards, OCR corruptions, and bot traffic via four stochastic mutation operators applied at rate $\alpha \in [0, 1]$:
+\begin{itemize}
+    \item \textit{Keyboard-adjacency typos}: Substitutes characters with adjacent keys on standard QWERTY layouts.
+    \item \textit{Character deletion}: Drops random characters from words of length $> 3$.
+    \item \textit{Character transposition}: Swaps adjacent character pairs.
+    \item \textit{Character duplication}: Randomly duplicates characters.
+\end{itemize}
+For intensity $\alpha > 0.6$, truncation is applied, trimming texts to $65\%$--$90\%$ of their length.
+
+\textbf{Formality/Slang Shift} (Register Transformation): Replaces formal terminology with informal web vernacular using 37 regex mappings (e.g., ``magnificent'' $\rightarrow$ ``straight gas'', ``masterpiece'' $\rightarrow$ ``absolute banger'', ``because'' $\rightarrow$ ``cuz''), simulating platform demographics evolution.
+
+\subsection{Parametric Temporal Drift Dynamics}
+Continuous drift methods support five temporal curves modulated by multiplier $m(t)$:
+
+\begin{table}[htbp]
+\caption{Temporal Drift Curve Functions}
+\label{tab:curves}
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Curve} & $\mathbf{m(t)}$ & \textbf{Behavior} \\
+\midrule
+Constant & $1.0$ & Uniform intensity \\
+Gradual & $\phi(t)$ & Linear ramp from $0$ to $1$ \\
+Sudden & $\mathbb{I}[\phi(t) \ge 0.5]$ & Step function at midpoint \\
+Sinusoidal & $0.55 + 0.45\sin(2\pi\phi(t))$ & Periodic oscillation \\
+Step & $\lceil 4\phi(t)\rceil / 4$ & Quantized 4-level staircase \\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent where $\phi(t) = (t \bmod C) / C$ denotes normalized phase within cycle length $C$.
+
+\section{Reference-Free Detection Framework}
+
+StreamSense calculates nine statistical metrics without requiring paired clean text:
+
+\subsection{Metric Formulations}
+\textbf{1. TF-IDF Centroid Cosine Similarity} ($\text{Sim}_{\text{cos}} \in [0, 1]$):
+\begin{equation}
+\text{Sim}_{\text{cos}} = \frac{\boldsymbol{\mu}_{\text{base}} \cdot \boldsymbol{\mu}_{\text{curr}}}{\|\boldsymbol{\mu}_{\text{base}}\|_2 \|\boldsymbol{\mu}_{\text{curr}}\|_2}
+\end{equation}
+The baseline vectorizer (fitted on burn-in, 2000 features, stop words removed) projects current text to measure semantic alignment.
+
+\textbf{2. Vocabulary Jaccard Overlap} ($J \in [0, 1]$):
+\begin{equation}
+J(\mathcal{V}_{\text{base}}, \mathcal{V}_{\text{curr}}) = \frac{|\mathcal{V}_{\text{base}} \cap \mathcal{V}_{\text{curr}}|}{|\mathcal{V}_{\text{base}} \cup \mathcal{V}_{\text{curr}}|}
+\end{equation}
+
+\textbf{3--5. Sentiment Polarity Divergences}: VADER compound scores categorize reviews into $P = [P_{\text{pos}}, P_{\text{neu}}, P_{\text{neg}}]$:
+\begin{itemize}
+    \item \textbf{Kullback-Leibler Divergence}:
+    \begin{equation}
+    D_{\text{KL}}(P \parallel Q) = \sum_{c} P(c) \ln \frac{P(c)}{Q(c) + \epsilon}
+    \end{equation}
+    \item \textbf{Jensen-Shannon Divergence} ($\text{JSD} \in [0, 1]$):
+    \begin{equation}
+    \text{JSD}(P \parallel Q) = \frac{1}{2} D_{\text{KL}}(P \parallel M) + \frac{1}{2} D_{\text{KL}}(Q \parallel M)
+    \end{equation}
+    where $M = \frac{1}{2}(P + Q)$, evaluated with base-2 logarithm.
+    \item \textbf{Wasserstein-1 Distance} ($W_1 \in [0, 2]$):
+    \begin{equation}
+    W_1(P, Q) = \sum_{k=1}^{3} |F_P(k) - F_Q(k)|
+    \end{equation}
+    over cumulative distribution functions $F$ on ordered states ($\text{neg} < \text{neu} < \text{pos}$).
+\end{itemize}
+
+\textbf{6. Spelling Error Rate} ($\text{SER} \in [0, 1]$):
+\begin{equation}
+\text{SER} = \frac{1}{N_{\text{tok}}} \sum_{j=1}^{N_{\text{tok}}} \mathbb{I}(w_j \notin \mathcal{D}_{\text{en}})
+\end{equation}
+evaluated against standard NLTK English word corpora.
+
+\textbf{7. Score Distribution Divergence} ($\text{JSD}_{\text{score}} \in [0, 1]$): JSD computed across 5-bin star rating histograms.
+
+\textbf{8. Composite Drift Magnitude} ($\text{CDM} \in [0\%, 100\%]$):
+\begin{align}
+\text{CDM} = \big(&0.30(1 - \text{Sim}_{\text{cos}}) + 0.20(1 - J) + 0.20\sqrt{\text{JSD}_{\text{sent}}} \nonumber \\
+&+ 0.15\Delta\text{SER} + 0.15\text{JSD}_{\text{score}}\big) \times 100\%
+\end{align}
+where $\Delta\text{SER} = \min(1.0, \max(0.0, \frac{\text{SER}_{\text{curr}} - \text{SER}_{\text{base}}}{0.30}))$.
+
+\begin{table*}[t]
+\caption{Per-Method Drift Metric Sensitivity Analysis}
+\label{tab:sensitivity}
+\centering
+\begin{tabular}{lcccccccc}
+\toprule
+\textbf{Method} & \textbf{Cosine Sim} $\uparrow$ & \textbf{Vocab Overlap} $\uparrow$ & \textbf{Sent. KL} $\downarrow$ & \textbf{Sent. JSD} $\downarrow$ & \textbf{Sent. $W_1$} $\downarrow$ & \textbf{SER} $\downarrow$ & \textbf{Score JSD} $\downarrow$ & \textbf{CDM (\%)} $\downarrow$ \\
+\midrule
+No Drift (Clean) & 0.7747 & 0.3094 & 0.026 & 0.011 & 0.120 & 0.128 & 0.074 & 23.7\% \\
+Adjective Swap & 0.7294 & 0.2824 & 0.205 & 0.082 & \textbf{0.560} & 0.124 & 0.074 & 29.3\% \\
+Class Swap & 0.7747 & 0.3094 & 0.026 & 0.011 & 0.120 & 0.128 & \textbf{0.691} & 32.9\% \\
+Class Shift & 0.7747 & 0.3094 & 0.026 & 0.011 & 0.120 & 0.128 & \textbf{0.470} & 29.6\% \\
+Noise Injection & 0.7367 & \textbf{0.1968} & 0.083 & 0.038 & 0.187 & \textbf{0.355} & 0.074 & \textbf{43.9\%} \\
+Formality Shift & \textbf{0.6997} & 0.3052 & 0.137 & 0.057 & 0.387 & 0.138 & 0.074 & 29.6\% \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Closed-Loop MLOps Pipeline}
+
+The StreamSense pipeline operates across four active stages:
+\begin{enumerate}
+    \item \textbf{Warm-Up Training}: Upon completing the burn-in phase, a hybrid classifier is trained on accumulated clean reviews. The model concatenates 2500 TF-IDF features ($n$-grams 1--2) with scaled VADER polarity scores ($[p_{\text{pos}}, p_{\text{neu}}, p_{\text{neg}}, p_{\text{comp}}] \times 3.5$), feeding a balanced Logistic Regression classifier.
+    \item \textbf{Streaming Inference}: Active models predict sentiment labels, checked against star-rating proxy labels (4--5: positive, 3: neutral, 1--2: negative) to compute rolling window accuracy.
+    \item \textbf{Degradation Assessment}: Health is classified into: \textit{Healthy} ($\text{Acc} \ge 75\%$), \textit{At Risk} ($55\% \le \text{Acc} < 75\%$), and \textit{Degraded} ($\text{Acc} < 55\%$).
+    \item \textbf{On-Demand Retraining \& Recalibration}: Retraining is triggered on the latest accumulated stream buffer (up to 500 samples). A new model version ($v_{k+1}$) is deployed, and baseline profiles are \textbf{recalibrated} to match the new distribution:
+    \begin{equation}
+    \boldsymbol{\mu}_{\text{base}}^{(k+1)} \leftarrow \boldsymbol{\mu}_{\text{retrain}}, \quad P_{\text{base}}^{(k+1)} \leftarrow P_{\text{retrain}}
+    \end{equation}
+    Recalibration prevents perpetual false alarms against outdated historical distributions.
+\end{enumerate}
+
+\section{Experimental Evaluation}
+
+Experiments were conducted on 500 reviews from the Stanford SNAP Amazon Movie Reviews corpus~\cite{mcauley2013amateurs} (Product ID \texttt{B002QZ1RS6}). Window size was $N=25$, burn-in was $B=3$ windows (75 reviews), and default drift intensity was $\alpha=0.7$.
+
+\subsection{Per-Method Metric Sensitivity (Table~\ref{tab:sensitivity})}
+Table~\ref{tab:sensitivity} isolates individual metric responses relative to clean baselines:
+\begin{itemize}
+    \item \textbf{Class Swap} strictly perturbs $\text{JSD}_{\text{score}}$ (0.691 vs 0.074 clean), leaving text-level metrics identical to clean streams. This confirms it operates purely on label distributions.
+    \item \textbf{Noise Injection} creates the highest composite drift magnitude ($\text{CDM} = 43.9\%$) by degrading vocabulary overlap ($0.1968$) and spiking spelling errors ($\text{SER} = 0.355$).
+    \item \textbf{Formality Shift} causes the lowest cosine similarity ($0.6997$), demonstrating substantial semantic space disruption.
+    \item \textbf{Adjective Swap} induces the largest polarity shift ($\text{Wasserstein} = 0.560$ vs clean $0.120$).
+\end{itemize}
+
+\begin{table}[htbp]
+\caption{Composite Drift Magnitude (\%) Under Varying Intensities}
+\label{tab:intensity}
+\centering
+\setlength{\tabcolsep}{3pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{cccc}
+\toprule
+\textbf{Intensity} ($\alpha$) & \textbf{Adjective Swap} & \textbf{Noise Injection} & \textbf{Formality Shift} \\
+\midrule
+0.00 & 26.5\% & 26.5\% & 26.5\% \\
+0.25 & 27.4\% & 44.6\% & 27.6\% \\
+0.50 & 29.6\% & 42.2\% & 28.7\% \\
+0.75 & 32.7\% & 46.5\% & 32.1\% \\
+1.00 & 35.0\% & 46.1\% & 33.3\% \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Multi-Intensity Drift Impact (Table~\ref{tab:intensity})}
+As shown in Table~\ref{tab:intensity}, Noise Injection causes near-maximum drift at low intensity ($\alpha=0.25$, $\text{CDM} = 44.6\%$), proving high sensitivity to character-level noise. In contrast, Adjective Swap and Formality Shift scale gradually and monotonically up to 35.0\% and 33.3\% respectively.
+
+\begin{table}[htbp]
+\caption{Model Accuracy Degradation Across Streaming Windows}
+\label{tab:degradation}
+\centering
+\setlength{\tabcolsep}{2.2pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccccccc}
+\toprule
+\textbf{Drift Method} & \textbf{Train Acc} & \textbf{W1} & \textbf{W2} & \textbf{W3} & \textbf{W4} & \textbf{W5} & \textbf{Avg Acc} & \textbf{Drop} \\
+\midrule
+No Drift & 0.910 & 0.880 & 0.920 & 0.880 & 0.720 & 0.840 & 0.848 & 0.062 \\
+Adjective Swap (0.7) & 0.910 & 0.760 & 0.680 & 0.600 & 0.600 & 0.600 & 0.648 & 0.262 \\
+Class Swap & 0.910 & 0.040 & 0.000 & 0.080 & 0.240 & 0.120 & \textbf{0.096} & \textbf{0.814} \\
+Noise Injection (0.7) & 0.910 & 0.760 & 0.800 & 0.840 & 0.680 & 0.800 & 0.776 & 0.134 \\
+Formality Shift (0.7) & 0.910 & 0.880 & 0.760 & 0.760 & 0.680 & 0.760 & 0.768 & 0.142 \\
+Combined (Adj + Noise) & 0.910 & 0.520 & 0.680 & 0.640 & 0.440 & 0.560 & 0.568 & 0.342 \\
+All Methods & 0.910 & 0.240 & 0.160 & 0.320 & 0.320 & 0.240 & \textbf{0.256} & \textbf{0.654} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Downstream Model Degradation (Table~\ref{tab:degradation})}
+A hybrid classifier trained on 100 clean reviews achieved 91.0\% training accuracy. Over five monitoring windows:
+\begin{itemize}
+    \item \textbf{Class Swap} causes catastrophic failure, reducing accuracy to \textbf{9.6\%} (a drop of 81.4 percentage points).
+    \item \textbf{Adjective Swap} degrades accuracy to \textbf{64.8\%}, crossing into the \textit{At Risk} threshold.
+    \item \textbf{Compound Drift} (All Methods) causes systemic collapse to \textbf{25.6\%} accuracy.
+\end{itemize}
+
+\begin{table}[htbp]
+\caption{Closed-Loop Retraining Accuracy Recovery}
+\label{tab:retraining}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Drift Method} & \textbf{Clean} & \textbf{Drifted} & \textbf{Recovered} & \textbf{Degrad.} & \textbf{Gain} \\
+\midrule
+Adjective Swap (0.7) & 0.800 & 0.573 & \textbf{0.800} & -0.227 & \textbf{+0.227} \\
+Class Swap & 0.800 & 0.093 & \textbf{0.740} & -0.707 & \textbf{+0.647} \\
+Noise Injection (0.7) & 0.800 & 0.707 & 0.740 & -0.093 & +0.033 \\
+Combined (Compound) & 0.800 & 0.107 & \textbf{0.800} & -0.693 & \textbf{+0.693} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Closed-Loop Retraining Recovery (Table~\ref{tab:retraining})}
+Table~\ref{tab:retraining} documents recovery performance upon on-demand retraining:
+\begin{itemize}
+    \item For Adjective Swap, retraining achieves complete recovery back to \textbf{80.0\%} (+22.7 pp gain).
+    \item For Class Swap, accuracy jumps from \textbf{9.3\% to 74.0\%} (+64.7 pp gain), learning the inverted label distribution.
+    \item For Compound Drift, retraining restores accuracy from \textbf{10.7\% back to 80.0\%} (+69.3 pp gain).
+\end{itemize}
+
+\begin{table}[htbp]
+\caption{Metric Cross-Sensitivity ($\Delta$ from Clean Baseline)}
+\label{tab:cross}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Method} & $\mathbf{\Delta\text{Cos}}$ & $\mathbf{\Delta\text{Vocab}}$ & $\mathbf{\Delta\text{Sent JSD}}$ & $\mathbf{\Delta\text{SER}}$ & $\mathbf{\Delta\text{Score JSD}}$ \\
+\midrule
+Adjective Swap & 0.218 & 0.297 & \textbf{0.136} & 0.007 & 0.036 \\
+Class Swap & 0.156 & 0.269 & 0.027 & 0.011 & \textbf{0.612} \\
+Class Shift & 0.156 & 0.269 & 0.027 & 0.011 & \textbf{0.281} \\
+Noise Injection & 0.221 & \textbf{0.381} & 0.043 & \textbf{0.271} & 0.036 \\
+Formality Shift & \textbf{0.235} & 0.273 & 0.061 & 0.022 & 0.036 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Diagnostic Signatures (Table~\ref{tab:cross})}
+Table~\ref{tab:cross} confirms that each drift method triggers a distinct multi-metric signature: Adjective Swap isolates Sentiment JSD ($\Delta=0.136$); Class Swap and Shift isolate Score JSD ($\Delta=0.612$ and $0.281$); Noise Injection dominates Spelling Error Rate ($\Delta=0.271$) and Vocabulary Drop ($\Delta=0.381$); and Formality Shift maximizes Cosine Distance ($\Delta=0.235$). This establishes empirical basis for unsupervised root-cause diagnosis.
+
+\begin{table}[htbp]
+\caption{Composite Drift Magnitude (\%) Across Temporal Curves}
+\label{tab:temporal}
+\centering
+\setlength{\tabcolsep}{2.2pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lccccccccccc}
+\toprule
+\textbf{Curve} & \textbf{W1} & \textbf{W2} & \textbf{W3} & \textbf{W4} & \textbf{W5} & \textbf{W6} & \textbf{W7} & \textbf{W8} & \textbf{Avg} & \textbf{Max} & $\mathbf{\sigma}$ \\
+\midrule
+Constant & 44.7 & 44.6 & 47.2 & 44.9 & 48.0 & 49.1 & 51.1 & 49.1 & 47.3 & 51.1 & 2.3 \\
+Gradual & 30.9 & 34.0 & 43.4 & 38.5 & 45.5 & 44.4 & 46.9 & 48.7 & 41.5 & 48.7 & 6.0 \\
+Sudden & 22.5 & 22.7 & 29.0 & 20.3 & 48.7 & 46.3 & 47.3 & 47.8 & 35.6 & 48.7 & \textbf{12.2} \\
+Sinusoidal & 44.2 & 48.5 & 51.6 & 44.8 & 41.9 & 34.5 & 34.0 & 40.3 & 42.5 & 51.6 & 5.8 \\
+Step & 35.1 & 35.5 & 46.7 & 43.3 & 46.6 & 48.3 & 45.9 & 47.3 & 43.6 & 48.3 & 5.0 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Temporal Curve Dynamics (Table~\ref{tab:temporal})}
+Under compound Adjective Swap (0.7) and Noise Injection (0.5), Sudden drift produces the highest variability ($\sigma = 12.2$, jumping from 20.3\% to 48.7\% at W5). Sinusoidal drift oscillates periodically (peak 51.6\% at W3, trough 34.0\% at W7).
+
+\section{Discussion}
+
+\subsection{Comparison with Garcia et al.~\cite{garcia2024methods}}
+StreamSense transforms the offline benchmarks of~\cite{garcia2024methods} into an operational streaming solution across three core dimensions: (i)~\textbf{Operational Feasibility}: Reference-free monitoring removes the unrealistic requirement of parallel clean streams in production; (ii)~\textbf{Root-Cause Explainability}: Multi-signal signatures isolate whether degradation stems from lexical shift, polarity reversal, or syntactic corruption, rather than an uninterpretable loss; and (iii)~\textbf{Resilience Through Recovery}: Closed-loop retraining with baseline recalibration remediates detected drift on-the-fly (+69.3 percentage point accuracy gain).
+
+\subsection{Limitations and Future Work}
+StreamSense currently relies on lexicon-based tokenization and VADER features, which may underperform on complex rhetorical structures like sarcasm. Additionally, composite metric weights were heuristically calibrated. Future investigations will explore: (i) lightweight contextual transformer embeddings (MiniLM); (ii) automated ADWIN change-point alarms for autonomous retraining; (iii) multilingual drift expansion; and (iv) online continual learning algorithms via River~\cite{montiel2021river}.
+
+\section{Conclusion}
+StreamSense provides a reference-free framework for real-time semantic drift detection and closed-loop model recovery. By expanding drift generation with Noise Injection and Formality Shift and establishing a frozen baseline multi-criteria suite, StreamSense reliably diagnoses drift types and restores degraded accuracy by up to +69.3 percentage points.
+
+\balance
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

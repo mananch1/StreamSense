@@ -93,8 +93,11 @@ INFORMAL_LEXICON = {
     r"\bterrible\b": "mid af",
     r"\bhorrible\b": "straight trash",
     r"\bvery good\b": "super valid",
+    r"\bgood\b": "decent fr",
+    r"\bbad\b": "trash",
     r"\bI do not like\b": "ngl hate",
     r"\bI really liked\b": "lowkey loved",
+    r"\bI really loved\b": "lowkey loved",
     r"\bdefinitely\b": "100%",
     r"\bmasterpiece\b": "absolute banger",
     r"\bboring\b": "a whole snoozefest",
@@ -113,6 +116,15 @@ INFORMAL_LEXICON = {
     r"\bexercise\b": "grind",
     r"\bminutes\b": "mins",
     r"\bprogram\b": "routine",
+    r"\bamazing\b": "jaw-dropping",
+    r"\bawesome\b": "cracked",
+    r"\bsuperb\b": "straight gas",
+    r"\bbrilliant\b": "insane",
+    r"\bexpensive\b": "overpriced af",
+    r"\blove\b": "stan",
+    r"\bhate\b": "despise",
+    r"\bfantastic\b": "wild",
+    r"\bwonderful\b": "vibey",
 }
 
 # Keyboard adjacency for realistic typo simulation
@@ -261,7 +273,7 @@ class DriftEngine:
             return text, []
 
         modifications = []
-        n_mutations = max(1, int(len(words_matches) * 0.12 * intensity))
+        n_mutations = max(1, int(len(words_matches) * (0.08 + 0.32 * intensity)))
         chosen_indices = sorted(random.sample(range(len(words_matches)), min(n_mutations, len(words_matches))), reverse=True)
 
         modified_text = text
@@ -299,6 +311,14 @@ class DriftEngine:
                 chars[char_idx] = replacement
 
             corrupted_word = "".join(chars)
+            if corrupted_word == orig_word:
+                # Guaranteed corruption fallback for selected word
+                if len(chars) > 2:
+                    chars[0], chars[1] = chars[1], chars[0]
+                elif len(chars) > 1:
+                    chars.append(chars[-1])
+                corrupted_word = "".join(chars)
+
             if corrupted_word != orig_word:
                 start, end = match.start(), match.end()
                 modified_text = modified_text[:start] + corrupted_word + modified_text[end:]

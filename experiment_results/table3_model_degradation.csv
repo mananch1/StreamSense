@@ -1,0 +1,8 @@
+drift_method,train_accuracy,window_1_acc,window_2_acc,window_3_acc,window_4_acc,window_5_acc,avg_accuracy,min_accuracy,accuracy_drop
+No Drift,0.91,0.88,0.92,0.88,0.72,0.84,0.848,0.72,0.062
+Adjective Swap (0.7),0.91,0.56,0.6,0.56,0.72,0.56,0.6,0.56,0.31
+Class Swap,0.91,0.04,0.0,0.08,0.24,0.12,0.096,0.0,0.814
+Noise Injection (0.7),0.91,0.8,0.76,0.76,0.6,0.76,0.736,0.6,0.174
+Formality Shift (0.7),0.91,0.84,0.76,0.84,0.6,0.76,0.76,0.6,0.15
+Combined (Adj+Noise),0.91,0.44,0.52,0.64,0.44,0.64,0.536,0.44,0.374
+All Methods,0.91,0.2,0.24,0.24,0.28,0.24,0.24,0.2,0.67

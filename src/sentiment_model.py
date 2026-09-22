@@ -11,9 +11,10 @@ Lightweight streaming sentiment classifier demonstrating closed-loop MLOps:
 import time
 import numpy as np
 from typing import List, Dict, Any, Optional
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from scipy.sparse import hstack
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
 
 
 def score_to_sentiment(score: float) -> str:
@@ -35,10 +36,16 @@ def score_to_sentiment(score: float) -> str:
 class SentimentModel:
     """
     Manages the lifecycle of the active streaming sentiment analysis model.
+    Uses a hybrid TF-IDF + VADER sentiment feature representation with balanced
+    class weighting so the model is sensitive to semantic, lexical, and syntactic text drift.
     """
 
     def __init__(self):
-        self.model: Optional[Pipeline] = None
+        self.vectorizer: Optional[TfidfVectorizer] = None
+        self.classifier: Optional[LogisticRegression] = None
+        self.model: Optional[Any] = None  # maintained for backward compatibility
+        self.vader = SentimentIntensityAnalyzer()
+
         self.version: str = "untrained"
         self.trained_at_timestamp: Optional[str] = None
         self.training_sample_count: int = 0
@@ -52,37 +59,68 @@ class SentimentModel:
         self.current_window_correct: int = 0
         self.last_window_accuracy: float = 1.0
 
+    def _get_vader_features(self, texts: List[str]) -> np.ndarray:
+        feats = []
+        for t in texts:
+            if not t or not t.strip():
+                feats.append([0.0, 1.0, 0.0, 0.0])
+            else:
+                s = self.vader.polarity_scores(t)
+                feats.append([s['pos'], s['neu'], s['neg'], s['compound']])
+        return np.array(feats, dtype=np.float32)
+
+    def _extract_features(self, texts: List[str], fit: bool = False):
+        if fit:
+            self.vectorizer = TfidfVectorizer(max_features=2500, stop_words='english', ngram_range=(1, 2))
+            X_tfidf = self.vectorizer.fit_transform(texts)
+        else:
+            if self.vectorizer is None:
+                raise ValueError("Model vectorizer has not been fitted.")
+            X_tfidf = self.vectorizer.transform(texts)
+
+        X_vader = self._get_vader_features(texts)
+        # Scale VADER sentiment features (pos, neu, neg, compound) so the classifier
+        # directly incorporates sentiment polarity priors that respond immediately to
+        # semantic inversions (antonyms) and syntactic degradation (noise / typos).
+        return hstack([X_tfidf, X_vader * 3.5])
+
     def train(self, texts: List[str], scores: List[float], version: str = "v1.0") -> Dict[str, Any]:
         """
-        Trains TF-IDF + Logistic Regression on provided texts and star scores.
+        Trains Hybrid TF-IDF + VADER Logistic Regression on provided texts and star scores.
         """
         if not texts or not scores or len(texts) != len(scores):
             return {"status": "error", "message": "Invalid training data: empty or mismatched lengths"}
 
         y = [score_to_sentiment(s) for s in scores]
 
-        # Ensure at least 2 classes exist for classification; if single class, pad minimal anchors
-        classes_present = set(y)
+        # Ensure representation across all 3 classes so multi-class classification is stable
         train_texts = list(texts)
         train_y = list(y)
-        if len(classes_present) < 2:
-            if "positive" not in classes_present:
-                train_texts.append("Excellent, brilliant, magnificent masterpiece!")
-                train_y.append("positive")
-            if "negative" not in classes_present:
-                train_texts.append("Terrible, awful, dreadful, boring waste of time.")
-                train_y.append("negative")
+        classes_present = set(y)
+        if "positive" not in classes_present:
+            train_texts.append("Excellent, brilliant, magnificent masterpiece!")
+            train_y.append("positive")
+        if "neutral" not in classes_present:
+            train_texts.append("Decent, average, ordinary watch, nothing special.")
+            train_y.append("neutral")
+        if "negative" not in classes_present:
+            train_texts.append("Terrible, awful, dreadful, boring waste of time.")
+            train_y.append("negative")
 
-        pipeline = Pipeline([
-            ('tfidf', TfidfVectorizer(max_features=2500, stop_words='english', ngram_range=(1, 2))),
-            ('clf', LogisticRegression(C=1.0, max_iter=250, solver='lbfgs', random_state=42))
-        ])
+        X = self._extract_features(train_texts, fit=True)
+        self.classifier = LogisticRegression(
+            C=1.0,
+            max_iter=300,
+            solver='lbfgs',
+            class_weight='balanced',
+            random_state=42
+        )
+        self.classifier.fit(X, train_y)
+        self.model = self.classifier
 
-        pipeline.fit(train_texts, train_y)
-        preds = pipeline.predict(train_texts)
+        preds = self.classifier.predict(X)
         acc = float(np.mean(preds == train_y))
 
-        self.model = pipeline
         self.version = version
         self.is_trained = True
         self.training_sample_count = len(texts)
@@ -108,18 +146,19 @@ class SentimentModel:
         """
         Runs inference on a single text.
         """
-        if not self.is_trained or self.model is None or not text.strip():
+        if not self.is_trained or self.classifier is None or not text.strip():
             return {
                 "prediction": "neutral",
                 "confidence": 0.5,
                 "probabilities": {"positive": 0.33, "neutral": 0.34, "negative": 0.33}
             }
 
-        proba = self.model.predict_proba([text])[0]
+        X = self._extract_features([text], fit=False)
+        proba = self.classifier.predict_proba(X)[0]
         class_idx = int(np.argmax(proba))
-        pred_class = str(self.model.classes_[class_idx])
+        pred_class = str(self.classifier.classes_[class_idx])
         conf = float(proba[class_idx])
-        probs_dict = {str(c): round(float(p), 3) for c, p in zip(self.model.classes_, proba)}
+        probs_dict = {str(c): round(float(p), 3) for c, p in zip(self.classifier.classes_, proba)}
 
         return {
             "prediction": pred_class,
@@ -238,6 +277,8 @@ class SentimentModel:
 
     def reset(self):
         """Resets model state back to untrained."""
+        self.vectorizer = None
+        self.classifier = None
         self.model = None
         self.version = "untrained"
         self.trained_at_timestamp = None
