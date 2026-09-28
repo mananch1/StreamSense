@@ -195,14 +195,14 @@ Each drift method was applied individually to evaluate which metrics respond and
 
 | Method | Cosine Sim | Vocab Overlap | Sent. KL | Sent. JSD | Sent. W1 | SER | Score JSD | CDM (%) |
 |---|---|---|---|---|---|---|---|---|
-| No Drift (Clean) | 0.7747 | 0.3094 | 0.026 | 0.011 | 0.120 | 0.128 | 0.074 | 23.7 |
-| Adjective Swap | 0.7294 | 0.2824 | 0.205 | 0.082 | 0.560 | 0.124 | 0.074 | 29.3 |
-| Class Swap | 0.7747 | 0.3094 | 0.026 | 0.011 | 0.120 | 0.128 | **0.691** | 32.9 |
-| Class Shift | 0.7747 | 0.3094 | 0.026 | 0.011 | 0.120 | 0.128 | **0.470** | 29.6 |
-| Noise Injection | 0.7367 | **0.1968** | 0.083 | 0.038 | 0.187 | **0.355** | 0.074 | **43.9** |
-| Formality Shift | **0.6997** | 0.3052 | 0.137 | 0.057 | 0.387 | 0.138 | 0.074 | 29.6 |
+| No Drift (Clean) | 0.7747 | 0.6790 | 0.026 | 0.011 | 0.120 | 0.017 | 0.074 | 7.3 |
+| Adjective Swap | 0.7333 | 0.6053 | 0.253 | 0.098 | **0.653** | 0.019 | 0.074 | 29.4 |
+| Class Swap | 0.7747 | 0.6790 | 0.026 | 0.011 | 0.120 | 0.017 | **0.691** | **72.2** |
+| Class Shift | 0.7747 | 0.6790 | 0.026 | 0.011 | 0.120 | 0.017 | **0.470** | **61.9** |
+| Noise Injection | 0.7367 | **0.3600** | 0.083 | 0.038 | 0.187 | **0.268** | 0.074 | **77.4** |
+| Formality Shift | **0.6997** | 0.6688 | 0.137 | 0.057 | 0.387 | 0.027 | 0.074 | 21.2 |
 
-**Key findings**: (i) Class Swap exclusively perturbs the Score Distribution JSD (0.691) while leaving all text-level metrics completely unchanged — confirming it is a pure label drift. (ii) Noise Injection produces the largest Composite Drift Magnitude (43.9%) due to simultaneously affecting vocabulary overlap (0.197), spelling error rate (0.355), and cosine similarity. (iii) Formality Shift primarily impacts cosine similarity (0.700) and sentiment Wasserstein distance (0.387), reflecting vocabulary replacement that alters both meaning and polarity. (iv) Adjective Swap uniquely elevates sentiment KL divergence (0.205) and Wasserstein distance (0.560), consistent with its targeted polarity reversal of sentiment-bearing adjectives.
+**Key findings**: (i) Clean baseline drift is tightly bounded at 7.3\% (down from 23.7\% before calibration). (ii) Class Swap and Class Shift produce acute drift alerts (72.2\% and 61.9\%) driven by Score Distribution JSD, mirroring the downstream accuracy drop. (iii) Noise Injection produces the highest overall drift magnitude (77.4\%) by simultaneously corrupting spelling (SER 0.268 vs 0.017) and degrading vocabulary coverage (0.360 vs 0.679). (iv) Adjective Swap uniquely elevates sentiment Wasserstein distance (0.653 vs 0.120), capturing polarity reversal.
 
 ### B. Multi-Intensity Drift Impact (Table II)
 
@@ -212,31 +212,31 @@ Three intensity-parameterized methods were tested at alpha in {0.0, 0.25, 0.5, 0
 
 | Intensity | Adjective Swap | Noise Injection | Formality Shift |
 |---|---|---|---|
-| 0.00 | 26.5 | 26.5 | 26.5 |
-| 0.25 | 27.4 | 44.6 | 27.6 |
-| 0.50 | 29.6 | 42.2 | 28.7 |
-| 0.75 | 32.7 | 46.5 | 32.1 |
-| 1.00 | 35.0 | 46.1 | 33.3 |
+| 0.00 | 3.4 | 3.4 | 3.4 |
+| 0.25 | 5.7 | 54.0 | 8.1 |
+| 0.50 | 18.4 | 74.9 | 10.6 |
+| 0.75 | 38.8 | 78.8 | 22.6 |
+| 1.00 | 70.5 | 78.8 | 26.6 |
 
-**Key findings**: Noise Injection exhibits the steepest response, reaching near-maximum drift magnitude at intensity 0.25, indicating that even mild typographical noise has an outsized impact on reference-free text metrics — particularly vocabulary overlap and spelling error rate. Adjective Swap and Formality Shift show more gradual, monotonically increasing profiles, consistent with their word-level (rather than character-level) perturbation mechanisms.
+**Key findings**: Baseline noise is just 3.4\% at intensity 0.00. Noise Injection exhibits the steepest response, reaching 54.0\% at intensity 0.25, while Adjective Swap and Formality Shift scale monotonically from 3.4\% up to 70.5\% and 26.6\% respectively.
 
 ### C. Sentiment Model Accuracy Degradation (Table III)
 
-A Logistic Regression classifier (hybrid TF-IDF + VADER features) was trained on 100 clean reviews (training accuracy: 91.0%) and then evaluated over 5 streaming windows of 25 reviews each under various drift conditions.
+A Logistic Regression classifier (hybrid TF-IDF + VADER features) was trained on 100 clean reviews (training accuracy: 94.0\%) and then evaluated over 5 streaming windows of 25 reviews each under various drift conditions.
 
 **Table III: Model Accuracy Degradation Under Drift**
 
 | Drift Method | Train Acc | W1 | W2 | W3 | W4 | W5 | Avg Acc | Drop |
 |---|---|---|---|---|---|---|---|---|
-| No Drift | 0.910 | 0.880 | 0.920 | 0.880 | 0.720 | 0.840 | 0.848 | 0.062 |
-| Adjective Swap (0.7) | 0.910 | 0.760 | 0.680 | 0.600 | 0.600 | 0.600 | 0.648 | 0.262 |
-| Class Swap | 0.910 | 0.040 | 0.000 | 0.080 | 0.240 | 0.120 | **0.096** | **0.814** |
-| Noise Injection (0.7) | 0.910 | 0.760 | 0.800 | 0.840 | 0.680 | 0.800 | 0.776 | 0.134 |
-| Formality Shift (0.7) | 0.910 | 0.880 | 0.760 | 0.760 | 0.680 | 0.760 | 0.768 | 0.142 |
-| Combined (Adj+Noise) | 0.910 | 0.520 | 0.680 | 0.640 | 0.440 | 0.560 | 0.568 | 0.342 |
-| All Methods | 0.910 | 0.240 | 0.160 | 0.320 | 0.320 | 0.240 | **0.256** | **0.654** |
+| No Drift | 0.940 | 0.880 | 1.000 | 0.880 | 0.720 | 0.800 | 0.856 | 0.084 |
+| Adjective Swap (0.7) | 0.940 | 0.640 | 0.760 | 0.600 | 0.440 | 0.520 | 0.592 | 0.348 |
+| Class Swap | 0.940 | 0.000 | 0.000 | 0.080 | 0.160 | 0.160 | **0.080** | **0.860** |
+| Noise Injection (0.7) | 0.940 | 0.800 | 0.920 | 0.800 | 0.680 | 0.760 | 0.792 | 0.148 |
+| Formality Shift (0.7) | 0.940 | 0.880 | 0.880 | 0.760 | 0.760 | 0.760 | 0.808 | 0.132 |
+| Combined (Adj+Noise) | 0.940 | 0.720 | 0.800 | 0.640 | 0.400 | 0.840 | 0.680 | 0.260 |
+| All Methods | 0.940 | 0.120 | 0.160 | 0.240 | 0.320 | 0.120 | **0.192** | **0.748** |
 
-**Key findings**: (i) Class Swap causes catastrophic model failure (accuracy drops to 9.6%) because it inverts the label space while leaving text unchanged — the model correctly identifies positive text but the ground truth label is now negative. (ii) Noise Injection and Formality Shift cause moderate degradation (13-14%) because the hybrid TF-IDF + VADER features retain partial resilience to surface-level text perturbation. (iii) Compound drift (All Methods) causes near-complete model failure (accuracy 25.6%), demonstrating that real-world drift — which typically involves multiple simultaneous perturbation sources — is significantly more destructive than any individual method.
+**Key findings**: (i) Class Swap causes catastrophic model failure (accuracy drops to 8.0\%, drop of 86.0 pp) because label assignment flips while text remains unchanged. (ii) Adjective Swap causes moderate degradation (59.2\%, drop of 34.8 pp) as sentiment polarities flip. (iii) Compound drift (All Methods) causes systemic collapse to 19.2\% accuracy.
 
 ### D. Retraining Recovery Analysis (Table IV)
 
@@ -246,12 +246,13 @@ After observing model degradation under drift, the model was retrained on accumu
 
 | Drift Method | Clean Acc | Drifted Acc | Recovered Acc | Degradation | Recovery Gain |
 |---|---|---|---|---|---|
-| Adjective Swap (0.7) | 0.800 | 0.573 | **0.800** | -0.227 | **+0.227** |
-| Class Swap | 0.800 | 0.093 | **0.740** | -0.707 | **+0.647** |
-| Noise Injection (0.7) | 0.800 | 0.707 | 0.740 | -0.093 | +0.033 |
-| Combined (Adj+Class+Noise) | 0.800 | 0.107 | **0.800** | -0.693 | **+0.693** |
+| Adjective Swap (0.7) | 0.820 | 0.533 | **0.840** | -0.287 | **+0.307** |
+| Class Swap | 0.820 | 0.053 | **0.720** | -0.767 | **+0.667** |
+| Class Shift | 0.820 | 0.213 | **0.700** | -0.607 | **+0.487** |
+| Noise Injection (0.7) | 0.820 | 0.680 | **0.740** | -0.140 | +0.060 |
+| Combined (Adj+Class+Noise) | 0.820 | 0.053 | **0.720** | -0.767 | **+0.667** |
 
-**Key findings**: (i) Retraining fully restores accuracy for Adjective Swap (+22.7 pp) and the Combined scenario (+69.3 pp), demonstrating that the closed-loop pipeline successfully adapts to the drifted distribution. (ii) Class Swap recovery reaches 74.0% (from 9.3%), a +64.7 pp gain — the model learns the inverted label mapping. (iii) Noise Injection shows minimal recovery gain (+3.3 pp) because the model already retained reasonable accuracy (70.7%) under syntactic noise. This validates that retraining is most beneficial for semantic and label drift, while syntactic noise may be better addressed through preprocessing.
+**Key findings**: (i) Retraining recovers accuracy for Class Swap (+66.7 pp gain to 72.0\%) and Class Shift (+48.7 pp gain to 70.0\%), demonstrating that the retrained model successfully learns shifted label boundaries. (ii) Adjective Swap achieves full recovery (+30.7 pp gain back to 84.0\%). (iii) The retrain window limit (150 samples) avoids contamination from pre-drift samples.
 
 ### E. Metric Cross-Sensitivity Matrix (Table V)
 

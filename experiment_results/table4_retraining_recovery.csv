@@ -1,5 +1,6 @@
 drift_method,clean_avg_accuracy,drifted_avg_accuracy,recovery_avg_accuracy,degradation,recovery_gain
-Adjective Swap (0.7),0.8,0.48,0.74,0.32,0.26
-Class Swap,0.8,0.0933,0.74,0.7067,0.6467
-Noise Injection (0.7),0.8,0.6533,0.7,0.1467,0.0467
-Combined (Adj+Class+Noise),0.8,0.04,0.68,0.76,0.64
+Adjective Swap (0.7),0.82,0.5333,0.84,0.2867,0.3067
+Class Swap,0.82,0.0533,0.72,0.7667,0.6667
+Class Shift,0.82,0.2133,0.7,0.6067,0.4867
+Noise Injection (0.7),0.82,0.68,0.74,0.14,0.06
+Combined (Adj+Class+Noise),0.82,0.0533,0.72,0.7667,0.6667

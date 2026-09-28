@@ -71,7 +71,10 @@ class SentimentModel:
 
     def _extract_features(self, texts: List[str], fit: bool = False):
         if fit:
-            self.vectorizer = TfidfVectorizer(max_features=2500, stop_words='english', ngram_range=(1, 2))
+            self.vectorizer = TfidfVectorizer(
+                max_features=5000, stop_words='english',
+                ngram_range=(1, 2), sublinear_tf=True
+            )
             X_tfidf = self.vectorizer.fit_transform(texts)
         else:
             if self.vectorizer is None:
@@ -79,10 +82,9 @@ class SentimentModel:
             X_tfidf = self.vectorizer.transform(texts)
 
         X_vader = self._get_vader_features(texts)
-        # Scale VADER sentiment features (pos, neu, neg, compound) so the classifier
-        # directly incorporates sentiment polarity priors that respond immediately to
-        # semantic inversions (antonyms) and syntactic degradation (noise / typos).
-        return hstack([X_tfidf, X_vader * 3.5])
+        # Scale VADER sentiment features so the classifier incorporates sentiment polarity
+        # priors without overwhelming learned n-gram features during retraining.
+        return hstack([X_tfidf, X_vader * 1.0])
 
     def train(self, texts: List[str], scores: List[float], version: str = "v1.0") -> Dict[str, Any]:
         """
@@ -110,7 +112,7 @@ class SentimentModel:
         X = self._extract_features(train_texts, fit=True)
         self.classifier = LogisticRegression(
             C=1.0,
-            max_iter=300,
+            max_iter=500,
             solver='lbfgs',
             class_weight='balanced',
             random_state=42

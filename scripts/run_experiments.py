@@ -287,6 +287,7 @@ def experiment_4_retraining_recovery(reviews):
     drift_configs = [
         ("Adjective Swap (0.7)", DriftConfig(enable_adjective_swap=True, adjective_swap_intensity=0.7)),
         ("Class Swap", DriftConfig(enable_class_swap=True)),
+        ("Class Shift", DriftConfig(enable_class_shift=True)),
         ("Noise Injection (0.7)", DriftConfig(enable_noise_injection=True, noise_intensity=0.7)),
         ("Combined (Adj+Class+Noise)", DriftConfig(
             enable_adjective_swap=True, adjective_swap_intensity=0.5,

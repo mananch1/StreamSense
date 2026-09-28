@@ -198,14 +198,17 @@ class FeedSimulator:
         self.metrics_calculator = DriftMetricsCalculator(burn_in_windows=self.config.burn_in_windows)
         self.sentiment_model.reset()
 
-    def retrain_model(self, sample_limit: int = 500) -> Dict[str, Any]:
+    def retrain_model(self, sample_limit: int = 150) -> Dict[str, Any]:
         """
         Retrains the sentiment model using the most recent accumulated stream items.
+        Using the most recent stream window prioritizes post-drift samples over obsolete
+        pre-drift samples so the model successfully recovers under concept drift.
         """
         if not self.accumulated_stream_items:
             return {"status": "error", "message": "No stream data accumulated yet to retrain model"}
 
-        corpus = self.accumulated_stream_items[-sample_limit:]
+        limit = min(sample_limit, len(self.accumulated_stream_items))
+        corpus = self.accumulated_stream_items[-limit:]
         texts = [it["drifted_text"] for it in corpus]
         scores = [it["drifted_score"] for it in corpus]
 
