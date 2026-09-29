@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="/static/style.css?v=20260903_v5" />
+  <link rel="stylesheet" href="/static/style.css?v=20260928_v6" />
 </head>
 <body class="dark-theme">
   <!-- Top App Header -->
@@ -38,6 +38,10 @@
         <span class="kpi-label">Drift Magnitude</span>
         <span class="kpi-val amber" id="statDriftScore">0.0%</span>
       </div>
+      <button class="btn-guide-header" id="btnOpenGuide" title="Open Presentation Pitch Guide & Evaluator Q&A">
+        <span class="guide-icon">🎓</span>
+        <span>Demo Guide</span>
+      </button>
     </div>
   </header>
 
@@ -70,6 +74,36 @@
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6M21.5 22v-6h-6"></path><path d="M22 11.5A10 10 0 0 0 3.2 7.2L2.5 8M2 12.5a10 10 0 0 0 18.8 4.3l.7-.8"></path></svg>
             Reset
           </button>
+        </div>
+
+        <!-- 1-Click Demo Scenarios Presets -->
+        <div class="presets-section">
+          <div class="presets-head">
+            <span class="presets-title">⚡ 1-Click Presentation Presets</span>
+            <span class="presets-tag">Demo Mode</span>
+          </div>
+          <div class="presets-grid">
+            <button class="preset-btn active" id="presetClean" data-preset="clean" title="Normal in-distribution stream. Drift ~3-7%, Accuracy ~85-92%">
+              <span class="p-dot dot-green"></span>
+              <span class="p-name">Clean Baseline</span>
+            </button>
+            <button class="preset-btn" id="presetAdj" data-preset="adjective" title="Adjective Swap active. Semantic antonym inversion. Accuracy ~60%, Drift ~38%">
+              <span class="p-dot dot-amber"></span>
+              <span class="p-name">Semantic Swap</span>
+            </button>
+            <button class="preset-btn" id="presetShift" data-preset="shift" title="Cyclic Class Shift (+1 star). Concept drift: Accuracy ~21%, Drift ~62%">
+              <span class="p-dot dot-rose"></span>
+              <span class="p-name">Cyclic Class Shift</span>
+            </button>
+            <button class="preset-btn" id="presetNoise" data-preset="noise" title="Noise & Slang active. Typo corruption & slang shift. Drift ~77%">
+              <span class="p-dot dot-purple"></span>
+              <span class="p-name">Noise & Slang</span>
+            </button>
+            <button class="preset-btn" id="presetStress" data-preset="stress" title="All methods combined. Severe multi-modal drift. Accuracy &lt; 20%, Drift ~85-95%">
+              <span class="p-dot dot-red"></span>
+              <span class="p-name">All Combined</span>
+            </button>
+          </div>
         </div>
 
         <!-- Section 1: Stream Parameters -->
@@ -272,6 +306,18 @@
         <div class="feed-badge-status" id="feedLiveStatus">STREAM IDLE</div>
       </div>
 
+      <!-- Real-Time Stream Health Alert Banner -->
+      <div class="stream-alert-banner banner-healthy" id="streamAlertBanner">
+        <div class="alert-icon-box" id="bannerIcon">🟢</div>
+        <div class="alert-body">
+          <div class="alert-title-row">
+            <span class="alert-title" id="bannerTitle">STREAM IN-DISTRIBUTION — MODEL HEALTHY</span>
+            <span class="alert-drift-tag" id="bannerDriftBadge">Drift: 0.0%</span>
+          </div>
+          <p class="alert-desc" id="bannerDesc">Drift magnitude is within calibrated baseline tolerance. Model predictions are highly reliable.</p>
+        </div>
+      </div>
+
       <div class="feed-column-bar">
         <div class="feed-bar-left">Original Input (Amazon Review)</div>
         <div class="feed-bar-right">
@@ -393,6 +439,181 @@
 
   </div>
 
-  <script src="/static/app.js?v=20260903_v5"></script>
+  <!-- ========================================================
+       Model Training Overlay Modal
+       ======================================================== -->
+  <div class="training-overlay" id="trainingOverlay" style="display:none;">
+    <div class="training-modal-card">
+      <button class="overlay-close-btn" id="btnCloseTrainingOverlay" title="Dismiss overlay">&times;</button>
+      
+      <!-- Top Cyber Indicator & Title -->
+      <div class="training-header">
+        <div class="training-spinner-box">
+          <div class="cyber-spinner"></div>
+          <div class="training-icon-center">🧠</div>
+        </div>
+        <div class="training-title-block">
+          <div class="training-badge-pulse">
+            <span class="badge-dot"></span>
+            ACTIVE MLOps RETRAINING PIPELINE
+          </div>
+          <h2 class="training-title">Retraining Sentiment Classifier</h2>
+          <p class="training-subtitle" id="trainingSubtitle">Buffering latest streaming samples to adapt decision boundary...</p>
+        </div>
+      </div>
+
+      <!-- Animated 4-Stage Pipeline Tracker -->
+      <div class="training-pipeline">
+        <div class="pipeline-step active" id="trainStep1">
+          <span class="step-num">01</span>
+          <div class="step-content">
+            <span class="step-label">Ingest Stream Window</span>
+            <span class="step-sub">Buffering recent post-drift reviews</span>
+          </div>
+          <span class="step-badge" id="step1Badge">RUNNING</span>
+        </div>
+        <div class="pipeline-step" id="trainStep2">
+          <span class="step-num">02</span>
+          <div class="step-content">
+            <span class="step-label">Feature Engineering</span>
+            <span class="step-sub">Sublinear TF-IDF (5k) + VADER priors</span>
+          </div>
+          <span class="step-badge" id="step2Badge">QUEUED</span>
+        </div>
+        <div class="pipeline-step" id="trainStep3">
+          <span class="step-num">03</span>
+          <div class="step-content">
+            <span class="step-label">Model Optimization</span>
+            <span class="step-sub">Balanced L-BFGS Logistic Regression</span>
+          </div>
+          <span class="step-badge" id="step3Badge">QUEUED</span>
+        </div>
+        <div class="pipeline-step" id="trainStep4">
+          <span class="step-num">04</span>
+          <div class="step-content">
+            <span class="step-label">Baseline Recalibration</span>
+            <span class="step-sub">Updating reference noise floors</span>
+          </div>
+          <span class="step-badge" id="step4Badge">QUEUED</span>
+        </div>
+      </div>
+
+      <!-- Live Animated Progress Track -->
+      <div class="training-progress-track">
+        <div class="training-progress-fill" id="trainingProgressFill" style="width: 15%;"></div>
+      </div>
+
+      <!-- Curated Random Facts Card -->
+      <div class="fact-card">
+        <div class="fact-card-header">
+          <div class="fact-header-left">
+            <span class="fact-tag">💡 AML INSIGHT</span>
+            <span class="fact-subtag">Did You Know?</span>
+          </div>
+          <span class="fact-counter" id="factCounter">Fact 1 of 8</span>
+        </div>
+        <div class="fact-body-container">
+          <p class="fact-body" id="factBody">
+            Loading architectural insight...
+          </p>
+        </div>
+        <div class="fact-actions">
+          <span class="fact-hint">Facts rotate during training pipeline</span>
+          <button class="fact-next-btn" id="btnNextFact">
+            <span>Next Insight</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Success Footer (Revealed upon completion) -->
+      <div class="training-success-footer" id="trainingSuccessFooter" style="display:none;">
+        <div class="success-pill">
+          <span class="success-check-badge">✓</span>
+          <div class="success-text-block">
+            <strong id="trainingSuccessTitle">Model v2.0 Deployed Successfully!</strong>
+            <span id="trainingSuccessMsg">Baseline profile recalibrated. Accuracy recovery active.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================================
+       Presentation & Demo Pitch Guide Modal
+       ======================================================== -->
+  <div class="guide-modal-overlay" id="guideModal" style="display:none;">
+    <div class="guide-modal-card">
+      <div class="guide-modal-header">
+        <div class="guide-title-row">
+          <span class="guide-icon-badge">🎓</span>
+          <div>
+            <h3>Presentation Demo Script & Evaluator Q&A</h3>
+            <p>Applied Machine Learning Project Defense Cheatsheet</p>
+          </div>
+        </div>
+        <button class="guide-close-btn" id="btnCloseGuide">&times;</button>
+      </div>
+
+      <div class="guide-modal-body">
+        
+        <!-- Section 1: 30-Sec Elevator Pitch -->
+        <div class="guide-section">
+          <h4>🎯 The 30-Second Elevator Pitch</h4>
+          <div class="guide-quote">
+            "In production streaming systems, machine learning models degrade silently because human ground-truth labels take days or weeks to arrive. <strong>StreamSense</strong> solves this by using reference-free statistical indicators (centroid cosine distance, in-vocabulary coverage, spelling error rates, and sentiment JSD) to detect drift in real time — alerting engineers to retrain <em>before</em> catastrophic accuracy drops occur."
+          </div>
+        </div>
+
+        <!-- Section 2: 4-Step Live Demo Flow -->
+        <div class="guide-section">
+          <h4>🚀 Recommended 4-Step Live Demo Flow</h4>
+          <div class="demo-steps-grid">
+            <div class="demo-step-box">
+              <span class="demo-num">1</span>
+              <strong>Burn-In & Baseline</strong>
+              <p>Click <em>Start Stream</em> on <strong>Clean Baseline</strong>. Note: Drift stays at <strong>~3-7%</strong> while model accuracy sits at <strong>~90%</strong>.</p>
+            </div>
+            <div class="demo-step-box">
+              <span class="demo-num">2</span>
+              <strong>Inject Cyclic Class Shift</strong>
+              <p>Click preset <strong>Cyclic Class Shift</strong>. Show the audience: the orange Drift % spikes to <strong>~62%</strong>, and green Model Accuracy collapses to <strong>~21%</strong>!</p>
+            </div>
+            <div class="demo-step-box">
+              <span class="demo-num">3</span>
+              <strong>Show Metric Specificity</strong>
+              <p>Point to Drift Analytics: <em>Score Distribution JSD</em> spiked to 0.47, while text metrics remained steady — proving it's concept drift!</p>
+            </div>
+            <div class="demo-step-box">
+              <span class="demo-num">4</span>
+              <strong>Closed-Loop Retrain</strong>
+              <p>Click <strong>Retrain Model on Stream Data</strong>! Watch the Training Overlay adapt to the shift: accuracy rebounds back to <strong>~70%</strong>, and drift drops back to <strong>~0-5%</strong>!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Tough Evaluator Q&A -->
+        <div class="guide-section">
+          <h4>💡 Tough Evaluator Q&A Cheatsheet</h4>
+          <div class="qa-item">
+            <strong>Q: "Why did clean data drift previously register 24% and how did you fix it?"</strong>
+            <p><strong>A:</strong> Two reasons: (1) Standard NLTK dictionaries flagged common inflections (<em>workouts</em>, <em>uses</em>, <em>exceeded</em>) as spelling errors. We expanded the lexicon with morphological rules, dropping false SER from 12.8% to 1.7%. (2) Small windows naturally vary in vocabulary. We introduced Leave-One-Out (LOO) burn-in cross-validation to calibrate empirical noise floors, ensuring clean streams read ~0-7%.</p>
+          </div>
+          <div class="qa-item">
+            <strong>Q: "Why did retraining fail under Cyclic Shift previously?"</strong>
+            <p><strong>A:</strong> Static rule-based sentiment lexicons (like VADER) have fixed polarities that cannot learn shifted labels. By balancing feature scaling ($C=1.0$) with sublinear TF-IDF n-grams and capping retraining to the most recent 150 stream samples, the model learns the shifted boundary, achieving a <strong>+48.7 pp</strong> recovery gain.</p>
+          </div>
+          <div class="qa-item">
+            <strong>Q: "Why max-blended aggregation instead of a simple average?"</strong>
+            <p><strong>A:</strong> In safety-critical MLOps, severe drift in <em>one</em> modality (e.g. pure label drift) causes model failure even if text is clean. A flat average dilutes a 100% label shift down to 15%. Our max-blended formula ($0.65 \times \text{max} + 0.35 \times \text{mean}$) triggers a sharp 60-75% alert immediately.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=20260928_v6"></script>
 </body>
 </html>
